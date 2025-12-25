@@ -1,0 +1,267 @@
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  ArrowLeft,
+  Phone,
+  Mail,
+  AlertTriangle,
+  MessageSquare,
+  Calendar,
+  Building2,
+  FileText,
+  CheckCircle,
+  Clock,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useCRMStore } from '@/stores/crmStore';
+import { STATUS_FUNIL_LABELS, TIPO_CONTATO_LABELS, StatusFunil } from '@/types/crm';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { RegistrarContatoDialog } from '@/components/clientes/RegistrarContatoDialog';
+import { GerarContratoDialog } from '@/components/juridico/GerarContratoDialog';
+
+const statusColors: Record<StatusFunil, string> = {
+  QUALIFICACAO: 'bg-primary text-primary-foreground',
+  VISITA_PROPOSTA: 'bg-warning text-warning-foreground',
+  DOCUMENTACAO: 'bg-orange-500 text-white',
+  FECHADO_GANHO: 'bg-success text-success-foreground',
+  FECHADO_PERDIDO: 'bg-destructive text-destructive-foreground',
+};
+
+const tipoContatoIcons: Record<string, React.ReactNode> = {
+  LIGACAO: <Phone className="w-4 h-4" />,
+  EMAIL: <Mail className="w-4 h-4" />,
+  WHATSAPP: <MessageSquare className="w-4 h-4" />,
+  VISITA: <Building2 className="w-4 h-4" />,
+  PROPOSTA: <FileText className="w-4 h-4" />,
+  NOTA: <FileText className="w-4 h-4" />,
+};
+
+export default function ClienteDetalhes() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { clientes, imoveis, historico, documentos, alertas } = useCRMStore();
+  const [contatoDialogOpen, setContatoDialogOpen] = useState(false);
+  const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
+
+  const cliente = clientes.find((c) => c.id === id);
+
+  if (!cliente) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Cliente não encontrado.</p>
+        <Button variant="link" onClick={() => navigate('/clientes')}>
+          Voltar para Clientes
+        </Button>
+      </div>
+    );
+  }
+
+  const clienteHistorico = historico.filter((h) => h.cliente_id === cliente.id);
+  const clienteDocumentos = documentos.filter((d) => d.cliente_id === cliente.id);
+  const clienteAlertas = alertas.filter((a) => a.cliente_id === cliente.id && !a.lido);
+  const imoveisInteresse = imoveis.filter((i) => cliente.imoveis_interesse.includes(i.id));
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/clientes')}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">{cliente.nome}</h1>
+            <Badge className={cn(statusColors[cliente.status_funil])}>
+              {STATUS_FUNIL_LABELS[cliente.status_funil]}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-4 mt-1 text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Phone className="w-4 h-4" />
+              {cliente.telefone}
+            </span>
+            {cliente.email && (
+              <span className="flex items-center gap-1">
+                <Mail className="w-4 h-4" />
+                {cliente.email}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Critical Alerts */}
+      {clienteAlertas.length > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-4 h-4" />
+              Alertas Críticos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1">
+              {clienteAlertas.map((alerta) => (
+                <li key={alerta.id} className="text-sm flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                  {alerta.mensagem}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Ações Rápidas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setContatoDialogOpen(true)}>
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Registrar Contato
+            </Button>
+            <Button variant="outline">
+              <Calendar className="w-4 h-4 mr-2" />
+              Agendar Visita
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/imoveis">
+                <Building2 className="w-4 h-4 mr-2" />
+                Vincular Imóvel
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={() => setContratoDialogOpen(true)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Gerar Contrato
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Properties of Interest */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Imóveis de Interesse ({imoveisInteresse.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {imoveisInteresse.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum imóvel vinculado ainda.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {imoveisInteresse.map((imovel) => (
+                  <li key={imovel.id} className="text-sm p-2 bg-muted rounded-lg">
+                    <p className="font-medium">{imovel.titulo}</p>
+                    <p className="text-muted-foreground">
+                      {imovel.bairro} •{' '}
+                      {imovel.valor > 10000
+                        ? `R$ ${(imovel.valor / 1000).toFixed(0)}k`
+                        : `R$ ${imovel.valor.toLocaleString('pt-BR')}/mês`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Documents */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Documentos ({clienteDocumentos.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {clienteDocumentos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum documento cadastrado.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {clienteDocumentos.map((doc) => (
+                  <li key={doc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded-lg">
+                    <span>{doc.nome}</span>
+                    {doc.validado ? (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-warning" />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* History Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            Histórico de Contatos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {clienteHistorico.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum contato registrado ainda.
+            </p>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-3 top-0 bottom-0 w-px bg-border" />
+              <ul className="space-y-4">
+                {clienteHistorico.map((item, index) => (
+                  <li key={item.id} className="relative pl-8">
+                    <div className="absolute left-0 top-1 w-6 h-6 rounded-full bg-card border-2 border-primary flex items-center justify-center">
+                      {tipoContatoIcons[item.tipo]}
+                    </div>
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        <span className="font-medium text-foreground">
+                          {TIPO_CONTATO_LABELS[item.tipo]}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {format(new Date(item.data), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-sm">{item.descricao}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <RegistrarContatoDialog
+        open={contatoDialogOpen}
+        onOpenChange={setContatoDialogOpen}
+        clienteId={cliente.id}
+      />
+      
+      <GerarContratoDialog
+        open={contratoDialogOpen}
+        onOpenChange={setContratoDialogOpen}
+        clienteId={cliente.id}
+      />
+    </div>
+  );
+}
