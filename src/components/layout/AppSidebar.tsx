@@ -1,104 +1,64 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Users, Building2, BarChart3, Scale, ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar';
+import { Home, Users, Building2, BarChart3, Scale, Settings } from 'lucide-react';
 import { useState } from 'react';
 import oliverLogo from '@/assets/oliver-logo.png';
-
-const menuItems = [
-  { icon: Home, label: 'Início', path: '/' },
-  { icon: Users, label: 'Clientes', path: '/clientes' },
-  { icon: Building2, label: 'Imóveis', path: '/imoveis' },
-  { icon: BarChart3, label: 'Funil de Vendas', path: '/funil' },
-  { icon: Scale, label: 'Jurídico', path: '/juridico' },
-];
+import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
+  const [open, setOpen] = useState(false);
+
+  const links = [
+    { label: 'Início', href: '/', icon: <Home className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Clientes', href: '/clientes', icon: <Users className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Imóveis', href: '/imoveis', icon: <Building2 className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Funil de Vendas', href: '/funil', icon: <BarChart3 className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Jurídico', href: '/juridico', icon: <Scale className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Configurações', href: '/configuracoes', icon: <Settings className="h-5 w-5 flex-shrink-0" /> },
+  ];
 
   return (
-    <aside
-      className={cn(
-        'h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border transition-all duration-300',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      {/* Logo */}
-      <div className={cn(
-        'flex items-center border-b border-sidebar-border',
-        collapsed ? 'justify-center p-3' : 'px-4 py-5'
-      )}>
-        <img 
-          src={oliverLogo} 
-          alt="Oliver Negócios Inteligentes" 
-          className={cn(
-            'object-contain transition-all duration-300',
-            collapsed ? 'w-10 h-10' : 'w-full h-16'
-          )}
-        />
-      </div>
-
-      {/* Tagline */}
-      {!collapsed && (
-        <div className="px-4 py-3 border-b border-sidebar-border">
-          <p className="text-xs text-sidebar-foreground/60 font-medium">
-            Seu Segundo Cérebro
-          </p>
+    <Sidebar open={open} setOpen={setOpen}>
+      <SidebarBody className="justify-between gap-10 bg-sidebar border-r border-sidebar-border">
+        <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+          <Logo open={open} />
+          <div className="mt-8 flex flex-col gap-2">
+            {links.map((link, idx) => (
+              <SidebarLink
+                key={idx}
+                link={link}
+                className={cn(
+                  "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2",
+                  "transition-all duration-200"
+                )}
+              />
+            ))}
+          </div>
         </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="flex-1 py-4">
-        <ul className="space-y-1 px-2">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-              (item.path !== '/' && location.pathname.startsWith(item.path));
-            
-            return (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                    'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    isActive && 'bg-sidebar-primary text-sidebar-primary-foreground',
-                    collapsed && 'justify-center'
-                  )}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && (
-                    <span className="font-medium text-sm">{item.label}</span>
-                  )}
-                </NavLink>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* Collapse Button */}
-      <div className="p-2 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            'w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent',
-            collapsed && 'px-0'
-          )}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              <span className="text-xs">Recolher</span>
-            </>
-          )}
-        </Button>
-      </div>
-    </aside>
+      </SidebarBody>
+    </Sidebar>
   );
 }
+
+const Logo = ({ open }: { open: boolean }) => {
+  return (
+    <div className="font-normal flex space-x-2 items-center text-sm py-1 relative z-20 px-1">
+      <Link to="/" className='flex-shrink-0'>
+        <img
+          src={oliverLogo}
+          className="h-8 w-auto flex-shrink-0"
+          alt="Oliver Negócios Inteligentes"
+        />
+      </Link>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: open ? 1 : 0 }}
+        className="font-medium text-sidebar-foreground whitespace-pre flex flex-col overflow-hidden"
+      >
+        <span className="font-semibold text-sm">OLIVER</span>
+        <span className="text-xs text-sidebar-foreground/70">Negócios Inteligentes</span>
+      </motion.div>
+    </div>
+  );
+};
