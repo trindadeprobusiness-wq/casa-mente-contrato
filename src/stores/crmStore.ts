@@ -6,7 +6,9 @@ import {
   HistoricoContato, 
   Documento,
   Contrato,
-  StatusFunil 
+  StatusFunil,
+  Corretor,
+  Preferencias
 } from '@/types/crm';
 import { 
   clientesMock, 
@@ -14,7 +16,9 @@ import {
   alertasMock, 
   historicoMock,
   documentosMock,
-  contratosMock 
+  contratosMock,
+  corretorMock,
+  preferenciasMock
 } from '@/data/mockData';
 
 interface CRMStore {
@@ -25,6 +29,8 @@ interface CRMStore {
   historico: HistoricoContato[];
   documentos: Documento[];
   contratos: Contrato[];
+  corretor: Corretor;
+  preferencias: Preferencias;
 
   // Cliente actions
   addCliente: (cliente: Omit<Cliente, 'id' | 'created_at' | 'documentos' | 'imoveis_interesse'>) => void;
@@ -50,6 +56,11 @@ interface CRMStore {
 
   // Vinculações
   vincularClienteImovel: (clienteId: string, imovelId: string) => void;
+
+  // Configurações actions
+  updateCorretor: (data: Partial<Corretor>) => void;
+  updatePreferencias: (data: Partial<Preferencias>) => void;
+  updatePreferenciasNotificacoes: (data: Partial<Preferencias['notificacoes']>) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -61,6 +72,8 @@ export const useCRMStore = create<CRMStore>((set) => ({
   historico: historicoMock,
   documentos: documentosMock,
   contratos: contratosMock,
+  corretor: corretorMock,
+  preferencias: preferenciasMock,
 
   addCliente: (cliente) =>
     set((state) => ({
@@ -172,5 +185,23 @@ export const useCRMStore = create<CRMStore>((set) => ({
           ? { ...i, clientes_interessados: [...new Set([...i.clientes_interessados, clienteId])] }
           : i
       ),
+    })),
+
+  updateCorretor: (data) =>
+    set((state) => ({
+      corretor: { ...state.corretor, ...data },
+    })),
+
+  updatePreferencias: (data) =>
+    set((state) => ({
+      preferencias: { ...state.preferencias, ...data },
+    })),
+
+  updatePreferenciasNotificacoes: (data) =>
+    set((state) => ({
+      preferencias: {
+        ...state.preferencias,
+        notificacoes: { ...state.preferencias.notificacoes, ...data },
+      },
     })),
 }));
