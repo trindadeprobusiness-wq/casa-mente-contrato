@@ -142,3 +142,40 @@ export const TIPO_CONTRATO_LABELS: Record<TipoContrato, string> = {
   DISTRATO: 'Termo de Distrato',
   PROCURACAO: 'Procuração',
 };
+
+// Configurações do Corretor
+export interface Corretor {
+  id: string;
+  nome: string;
+  creci: string;
+  creci_estado: string;
+  email: string;
+  telefone: string;
+  endereco?: string;
+  website?: string;
+  razao_social?: string;
+  cnpj_cpf?: string;
+  endereco_completo?: string;
+  foto_url?: string;
+}
+
+export interface PreferenciasNotificacoes {
+  followup_atrasado: boolean;
+  exclusividade_vencendo: boolean;
+  documento_vencendo: boolean;
+  novo_cliente: boolean;
+}
+
+export type TemaAparencia = 'light' | 'dark' | 'system';
+export type FormatoMoeda = 'completo' | 'abreviado';
+export type OrdenacaoClientes = 'nome' | 'ultimo_contato' | 'created_at';
+
+export interface Preferencias {
+  notificacoes: PreferenciasNotificacoes;
+  antecedencia_exclusividade_dias: number;
+  antecedencia_documento_dias: number;
+  tema: TemaAparencia;
+  sidebar_expandida: boolean;
+  formato_moeda: FormatoMoeda;
+  ordenacao_clientes: OrdenacaoClientes;
+}

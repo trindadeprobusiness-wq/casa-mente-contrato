@@ -296,9 +296,30 @@ export const documentosMock: Documento[] = [
 
 export const contratosMock: Contrato[] = [];
 
-export const corretorMock = {
+export const corretorMock: import('@/types/crm').Corretor = {
+  id: 'corretor-1',
   nome: 'Ricardo Ferreira',
-  creci: 'CRECI 123456-SP',
+  creci: '123456',
+  creci_estado: 'SP',
   email: 'ricardo@olivercrm.com.br',
   telefone: '(11) 99999-0000',
+  endereco: 'Av. Paulista, 1000 - São Paulo/SP',
+  razao_social: 'RF Negócios Imobiliários LTDA',
+  cnpj_cpf: '12.345.678/0001-90',
+  endereco_completo: 'Av. Paulista, 1000, Sala 501 - Bela Vista, São Paulo/SP - CEP 01310-100',
+};
+
+export const preferenciasMock: import('@/types/crm').Preferencias = {
+  notificacoes: {
+    followup_atrasado: true,
+    exclusividade_vencendo: true,
+    documento_vencendo: true,
+    novo_cliente: false,
+  },
+  antecedencia_exclusividade_dias: 7,
+  antecedencia_documento_dias: 15,
+  tema: 'light',
+  sidebar_expandida: true,
+  formato_moeda: 'completo',
+  ordenacao_clientes: 'ultimo_contato',
 };
