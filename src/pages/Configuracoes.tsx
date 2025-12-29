@@ -1,12 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useTheme } from 'next-themes';
 import { useCRMStore } from '@/stores/crmStore';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  corretorSchema, 
+  type CorretorFormData,
+  formatarTelefone,
+  formatarCpfCnpj
+} from '@/lib/validators';
 import { 
   User, 
   Bell, 
   Palette, 
   Save,
-  Camera,
   Building2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,12 +25,13 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { FotoPerfilUpload } from '@/components/configuracoes/FotoPerfilUpload';
 import type { TemaAparencia, FormatoMoeda, OrdenacaoClientes } from '@/types/crm';
 
 const Configuracoes = () => {
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const { 
     corretor, 
     preferencias, 
@@ -31,26 +40,63 @@ const Configuracoes = () => {
     updatePreferenciasNotificacoes 
   } = useCRMStore();
 
-  // Local state for form editing
-  const [perfilForm, setPerfilForm] = useState({
-    nome: corretor.nome,
-    creci: corretor.creci,
-    creci_estado: corretor.creci_estado,
-    email: corretor.email,
-    telefone: corretor.telefone,
-    endereco: corretor.endereco || '',
-    website: corretor.website || '',
-    razao_social: corretor.razao_social || '',
-    cnpj_cpf: corretor.cnpj_cpf || '',
-    endereco_completo: corretor.endereco_completo || '',
+  // React Hook Form with Zod validation
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isValid }
+  } = useForm<CorretorFormData>({
+    resolver: zodResolver(corretorSchema),
+    defaultValues: {
+      nome: corretor.nome,
+      creci: corretor.creci,
+      creci_estado: corretor.creci_estado,
+      email: corretor.email,
+      telefone: corretor.telefone,
+      endereco: corretor.endereco || '',
+      website: corretor.website || '',
+      razao_social: corretor.razao_social || '',
+      cnpj_cpf: corretor.cnpj_cpf || '',
+      endereco_completo: corretor.endereco_completo || '',
+    },
+    mode: 'onChange',
   });
 
-  const handleSalvarPerfil = () => {
-    updateCorretor(perfilForm);
+  // Watch fields for formatting
+  const telefone = watch('telefone');
+  const cnpjCpf = watch('cnpj_cpf');
+
+  // Format phone as user types
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatarTelefone(e.target.value);
+    setValue('telefone', formatted, { shouldValidate: true });
+  };
+
+  // Format CPF/CNPJ as user types
+  const handleCnpjCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatarCpfCnpj(e.target.value);
+    setValue('cnpj_cpf', formatted, { shouldValidate: true });
+  };
+
+  // Sync theme preference with next-themes
+  useEffect(() => {
+    if (preferencias.tema) {
+      setTheme(preferencias.tema);
+    }
+  }, [preferencias.tema, setTheme]);
+
+  const onSubmit = (data: CorretorFormData) => {
+    updateCorretor(data);
     toast({
       title: 'Perfil atualizado',
       description: 'Suas informações foram salvas com sucesso.',
     });
+  };
+
+  const handleFotoChange = (fotoBase64: string) => {
+    updateCorretor({ foto_url: fotoBase64 });
   };
 
   const handleToggleNotificacao = (key: keyof typeof preferencias.notificacoes) => {
@@ -74,6 +120,7 @@ const Configuracoes = () => {
   };
 
   const handleAlterarTema = (tema: TemaAparencia) => {
+    setTheme(tema);
     updatePreferencias({ tema });
     toast({
       title: 'Tema alterado',
@@ -90,15 +137,6 @@ const Configuracoes = () => {
       title: 'Preferência salva',
       description: 'Configuração atualizada com sucesso.',
     });
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
   };
 
   return (
@@ -128,161 +166,173 @@ const Configuracoes = () => {
 
         {/* Tab Perfil */}
         <TabsContent value="perfil" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Dados do Corretor
-              </CardTitle>
-              <CardDescription>
-                Informações pessoais e profissionais
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Foto de Perfil */}
-              <div className="flex items-center gap-6">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={corretor.foto_url} />
-                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                    {getInitials(corretor.nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-2">
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <Camera className="h-4 w-4" />
-                    Alterar foto
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG ou GIF. Máx 2MB.
-                  </p>
-                </div>
-              </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Dados do Corretor
+                </CardTitle>
+                <CardDescription>
+                  Informações pessoais e profissionais
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Foto de Perfil */}
+                <FotoPerfilUpload 
+                  fotoUrl={corretor.foto_url}
+                  nome={corretor.nome}
+                  onFotoChange={handleFotoChange}
+                />
 
-              <Separator />
+                <Separator />
 
-              {/* Dados Pessoais */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome Completo</Label>
-                  <Input
-                    id="nome"
-                    value={perfilForm.nome}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, nome: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={perfilForm.email}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={perfilForm.telefone}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, telefone: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                {/* Dados Pessoais */}
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="creci">CRECI</Label>
+                    <Label htmlFor="nome">Nome Completo</Label>
                     <Input
-                      id="creci"
-                      value={perfilForm.creci}
-                      onChange={(e) => setPerfilForm({ ...perfilForm, creci: e.target.value })}
+                      id="nome"
+                      {...register('nome')}
+                      className={errors.nome ? 'border-destructive' : ''}
+                    />
+                    {errors.nome && (
+                      <p className="text-sm text-destructive">{errors.nome.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      {...register('email')}
+                      className={errors.email ? 'border-destructive' : ''}
+                    />
+                    {errors.email && (
+                      <p className="text-sm text-destructive">{errors.email.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input
+                      id="telefone"
+                      value={telefone}
+                      onChange={handleTelefoneChange}
+                      placeholder="(00) 00000-0000"
+                      className={errors.telefone ? 'border-destructive' : ''}
+                    />
+                    {errors.telefone && (
+                      <p className="text-sm text-destructive">{errors.telefone.message}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="creci">CRECI</Label>
+                      <Input
+                        id="creci"
+                        {...register('creci')}
+                        placeholder="123456-F"
+                        className={errors.creci ? 'border-destructive' : ''}
+                      />
+                      {errors.creci && (
+                        <p className="text-sm text-destructive">{errors.creci.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="creci_estado">Estado</Label>
+                      <Select
+                        value={watch('creci_estado')}
+                        onValueChange={(value) => setValue('creci_estado', value, { shouldValidate: true })}
+                      >
+                        <SelectTrigger className={errors.creci_estado ? 'border-destructive' : ''}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map((uf) => (
+                            <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.creci_estado && (
+                        <p className="text-sm text-destructive">{errors.creci_estado.message}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="endereco">Endereço Comercial</Label>
+                    <Input
+                      id="endereco"
+                      {...register('endereco')}
+                      placeholder="Ex: Av. Paulista, 1000 - São Paulo/SP"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="website">Website / Redes Sociais</Label>
+                    <Input
+                      id="website"
+                      {...register('website')}
+                      placeholder="https://..."
+                      className={errors.website ? 'border-destructive' : ''}
+                    />
+                    {errors.website && (
+                      <p className="text-sm text-destructive">{errors.website.message}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Dados para Contratos
+                </CardTitle>
+                <CardDescription>
+                  Informações utilizadas na geração de contratos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="razao_social">Razão Social / Nome Fantasia</Label>
+                    <Input
+                      id="razao_social"
+                      {...register('razao_social')}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="creci_estado">Estado</Label>
-                    <Select
-                      value={perfilForm.creci_estado}
-                      onValueChange={(value) => setPerfilForm({ ...perfilForm, creci_estado: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map((uf) => (
-                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="cnpj_cpf">CNPJ ou CPF</Label>
+                    <Input
+                      id="cnpj_cpf"
+                      value={cnpjCpf}
+                      onChange={handleCnpjCpfChange}
+                      placeholder="00.000.000/0000-00 ou 000.000.000-00"
+                      className={errors.cnpj_cpf ? 'border-destructive' : ''}
+                    />
+                    {errors.cnpj_cpf && (
+                      <p className="text-sm text-destructive">{errors.cnpj_cpf.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="endereco_completo">Endereço Completo (para contratos)</Label>
+                    <Input
+                      id="endereco_completo"
+                      {...register('endereco_completo')}
+                      placeholder="Rua, número, complemento, bairro, cidade/UF - CEP"
+                    />
                   </div>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="endereco">Endereço Comercial</Label>
-                  <Input
-                    id="endereco"
-                    value={perfilForm.endereco}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, endereco: e.target.value })}
-                    placeholder="Ex: Av. Paulista, 1000 - São Paulo/SP"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="website">Website / Redes Sociais</Label>
-                  <Input
-                    id="website"
-                    value={perfilForm.website}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, website: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Dados para Contratos
-              </CardTitle>
-              <CardDescription>
-                Informações utilizadas na geração de contratos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="razao_social">Razão Social / Nome Fantasia</Label>
-                  <Input
-                    id="razao_social"
-                    value={perfilForm.razao_social}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, razao_social: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj_cpf">CNPJ ou CPF</Label>
-                  <Input
-                    id="cnpj_cpf"
-                    value={perfilForm.cnpj_cpf}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, cnpj_cpf: e.target.value })}
-                    placeholder="00.000.000/0000-00 ou 000.000.000-00"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="endereco_completo">Endereço Completo (para contratos)</Label>
-                  <Input
-                    id="endereco_completo"
-                    value={perfilForm.endereco_completo}
-                    onChange={(e) => setPerfilForm({ ...perfilForm, endereco_completo: e.target.value })}
-                    placeholder="Rua, número, complemento, bairro, cidade/UF - CEP"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSalvarPerfil} className="flex items-center gap-2">
-              <Save className="h-4 w-4" />
-              Salvar Alterações
-            </Button>
-          </div>
+            <div className="flex justify-end">
+              <Button type="submit" className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Salvar Alterações
+              </Button>
+            </div>
+          </form>
         </TabsContent>
 
         {/* Tab Notificações */}
@@ -434,7 +484,7 @@ const Configuracoes = () => {
                   className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer [&:has([data-state=checked])]:border-primary"
                 >
                   <RadioGroupItem value="dark" id="tema-dark" className="sr-only" />
-                  <div className="h-8 w-8 rounded-full bg-slate-900 border shadow-sm mb-2" />
+                  <div className="h-8 w-8 rounded-full bg-sidebar-background border shadow-sm mb-2" />
                   <span className="text-sm font-medium">Escuro</span>
                 </Label>
                 <Label
@@ -442,7 +492,7 @@ const Configuracoes = () => {
                   className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer [&:has([data-state=checked])]:border-primary"
                 >
                   <RadioGroupItem value="system" id="tema-system" className="sr-only" />
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-background to-slate-900 border shadow-sm mb-2" />
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-background to-sidebar-background border shadow-sm mb-2" />
                   <span className="text-sm font-medium">Sistema</span>
                 </Label>
               </RadioGroup>
