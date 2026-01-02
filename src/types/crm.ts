@@ -114,6 +114,10 @@ export interface Contrato {
   conteudo: string;
   status: 'RASCUNHO' | 'FINALIZADO';
   created_at: string;
+  // Campos de versionamento e IA
+  versao?: number;
+  modelo_ia?: string;
+  tempo_geracao_ms?: number;
 }
 
 export const STATUS_FUNIL_LABELS: Record<StatusFunil, string> = {
