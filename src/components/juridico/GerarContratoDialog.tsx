@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,162 +10,577 @@ import { Progress } from '@/components/ui/progress';
 import { useCRMStore } from '@/stores/crmStore';
 import { TipoContrato, TIPO_CONTRATO_LABELS } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { AlertTriangle, Sparkles, Download, FileText, Loader2, X, Edit3, Check } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { generateContractDocx, formatContractForPreview } from '@/services/contractDocxService';
 
-interface GerarContratoDialogProps { open: boolean; onOpenChange: (open: boolean) => void; clienteId?: string; }
+interface GerarContratoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clienteId?: string;
+}
+
+interface FormState {
+  tipo: TipoContrato;
+  cliente_id: string;
+  imovel_id: string;
+  valor: number;
+  data_inicio: string;
+  prazo_meses: number;
+  dia_vencimento: number;
+  indice_reajuste: string;
+  permite_animais: boolean;
+  permite_reformas: boolean;
+  mobiliado: boolean;
+  clausulas_adicionais: string;
+}
 
 export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarContratoDialogProps) {
-  const { clientes, imoveis, addContrato } = useCRMStore();
+  const { clientes, imoveis, corretor, addContrato } = useCRMStore();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [contratoGerado, setContratoGerado] = useState('');
-  const [form, setForm] = useState({ tipo: 'LOCACAO_RESIDENCIAL' as TipoContrato, cliente_id: clienteId || '', imovel_id: '', valor: 0, data_inicio: '', prazo_meses: 30, dia_vencimento: 10, indice_reajuste: 'IGPM', permite_animais: false, permite_reformas: false, mobiliado: false });
+  const [modeloIA, setModeloIA] = useState('');
+  const [tempoGeracao, setTempoGeracao] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContrato, setEditedContrato] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  const [form, setForm] = useState<FormState>({
+    tipo: 'LOCACAO_RESIDENCIAL',
+    cliente_id: clienteId || '',
+    imovel_id: '',
+    valor: 0,
+    data_inicio: '',
+    prazo_meses: 30,
+    dia_vencimento: 10,
+    indice_reajuste: 'IGPM',
+    permite_animais: false,
+    permite_reformas: false,
+    mobiliado: false,
+    clausulas_adicionais: '',
+  });
 
   const selectedCliente = clientes.find(c => c.id === form.cliente_id);
   const selectedImovel = imoveis.find(i => i.id === form.imovel_id);
 
-  const gerarContrato = async () => {
-    setGenerating(true);
+  const resetDialog = () => {
+    setStep(1);
+    setContratoGerado('');
+    setEditedContrato('');
+    setIsEditing(false);
     setProgress(0);
-    const interval = setInterval(() => setProgress(p => Math.min(p + 15, 90)), 300);
-    
-    await new Promise(r => setTimeout(r, 2500));
-    clearInterval(interval);
-    setProgress(100);
+    setModeloIA('');
+    setTempoGeracao(0);
+  };
 
-    const contrato = `# CONTRATO DE ${TIPO_CONTRATO_LABELS[form.tipo].toUpperCase()}
+  const gerarContrato = async () => {
+    if (!selectedCliente || !selectedImovel) {
+      toast({ title: 'Erro', description: 'Selecione cliente e imóvel', variant: 'destructive' });
+      return;
+    }
 
-## PARTES CONTRATANTES
+    setGenerating(true);
+    setProgress(10);
+    abortControllerRef.current = new AbortController();
 
-**LOCADOR:** ${selectedImovel?.proprietario_nome || 'Proprietário'}, CPF: ${selectedImovel?.proprietario_cpf || '000.000.000-00'}
+    // Simulate progress while waiting for API
+    const progressInterval = setInterval(() => {
+      setProgress(p => Math.min(p + 5, 85));
+    }, 500);
 
-**LOCATÁRIO:** ${selectedCliente?.nome || 'Cliente'}, CPF: Não informado, Telefone: ${selectedCliente?.telefone || ''}
+    try {
+      const requestBody = {
+        tipo: TIPO_CONTRATO_LABELS[form.tipo],
+        cliente: {
+          nome: selectedCliente.nome,
+          telefone: selectedCliente.telefone,
+          email: selectedCliente.email,
+        },
+        imovel: {
+          endereco: selectedImovel.endereco,
+          bairro: selectedImovel.bairro,
+          cidade: selectedImovel.cidade,
+          tipo: selectedImovel.tipo,
+          area_m2: selectedImovel.area_m2,
+          dormitorios: selectedImovel.dormitorios,
+          garagem: selectedImovel.garagem,
+          descricao: selectedImovel.descricao,
+        },
+        proprietario: {
+          nome: selectedImovel.proprietario_nome,
+          cpf: selectedImovel.proprietario_cpf,
+          telefone: selectedImovel.proprietario_telefone,
+        },
+        corretor: {
+          nome: corretor.nome,
+          creci: corretor.creci,
+          creci_estado: corretor.creci_estado,
+          telefone: corretor.telefone,
+          email: corretor.email,
+        },
+        detalhes: {
+          valor: form.valor,
+          data_inicio: form.data_inicio,
+          prazo_meses: form.prazo_meses,
+          dia_vencimento: form.dia_vencimento,
+          indice_reajuste: form.indice_reajuste,
+          permite_animais: form.permite_animais,
+          permite_reformas: form.permite_reformas,
+          mobiliado: form.mobiliado,
+          clausulas_adicionais: form.clausulas_adicionais,
+        },
+      };
 
-## OBJETO DO CONTRATO
+      const { data, error } = await supabase.functions.invoke('gerar-contrato', {
+        body: requestBody,
+      });
 
-O LOCADOR dá em locação ao LOCATÁRIO o imóvel situado à **${selectedImovel?.endereco}, ${selectedImovel?.bairro} - ${selectedImovel?.cidade}**, com área de ${selectedImovel?.area_m2}m², contendo ${selectedImovel?.dormitorios} dormitório(s) e ${selectedImovel?.garagem} vaga(s) de garagem.
+      clearInterval(progressInterval);
 
-## PRAZO E VALOR
+      if (error) {
+        console.error('Error generating contract:', error);
+        throw new Error(error.message || 'Erro ao gerar contrato');
+      }
 
-- **Início:** ${form.data_inicio || 'A definir'}
-- **Prazo:** ${form.prazo_meses} meses
-- **Valor do Aluguel:** R$ ${form.valor.toLocaleString('pt-BR')}/mês
-- **Vencimento:** Todo dia ${form.dia_vencimento}
-- **Reajuste:** ${form.indice_reajuste}
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
-## CLÁUSULAS ADICIONAIS
+      setProgress(100);
+      const formattedContrato = formatContractForPreview(data.contrato);
+      setContratoGerado(formattedContrato);
+      setEditedContrato(formattedContrato);
+      setModeloIA(data.modelo_ia || 'google/gemini-2.5-flash');
+      setTempoGeracao(data.tempo_geracao_ms || 0);
+      setStep(4);
 
-${form.permite_animais ? '✅ Permitido animais de estimação' : '❌ Não permitido animais'}
-${form.permite_reformas ? '✅ Permitidas reformas com autorização' : '❌ Não permitidas reformas'}
-${form.mobiliado ? '✅ Imóvel mobiliado' : '❌ Imóvel não mobiliado'}
+      toast({
+        title: 'Contrato gerado!',
+        description: `Gerado em ${((data.tempo_geracao_ms || 0) / 1000).toFixed(1)}s`,
+      });
+    } catch (error) {
+      clearInterval(progressInterval);
+      console.error('Contract generation error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      toast({
+        title: 'Erro ao gerar contrato',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+      abortControllerRef.current = null;
+    }
+  };
 
----
-
-**Local e Data:** São Paulo, ${new Date().toLocaleDateString('pt-BR')}
-
-_____________________________
-**LOCADOR**
-
-_____________________________
-**LOCATÁRIO**`;
-
-    setContratoGerado(contrato);
+  const cancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     setGenerating(false);
-    setStep(4);
+    setProgress(0);
+  };
+
+  const baixarDocx = async () => {
+    if (!selectedCliente) return;
+    
+    setDownloading(true);
+    try {
+      const conteudoFinal = isEditing ? editedContrato : contratoGerado;
+      await generateContractDocx(conteudoFinal, {
+        clienteNome: selectedCliente.nome,
+        tipoContrato: TIPO_CONTRATO_LABELS[form.tipo],
+      });
+      
+      toast({
+        title: 'Download iniciado!',
+        description: 'O arquivo .docx está sendo baixado.',
+      });
+    } catch (error) {
+      console.error('Error generating DOCX:', error);
+      toast({
+        title: 'Erro ao gerar documento',
+        description: 'Não foi possível gerar o arquivo Word.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const salvarContrato = () => {
-    addContrato({ tipo: form.tipo, cliente_id: form.cliente_id, imovel_id: form.imovel_id, valor: form.valor, data_inicio: form.data_inicio, prazo_meses: form.prazo_meses, dia_vencimento: form.dia_vencimento, indice_reajuste: form.indice_reajuste, conteudo: contratoGerado, status: 'RASCUNHO' });
-    toast({ title: 'Contrato salvo!' });
+    const conteudoFinal = isEditing ? editedContrato : contratoGerado;
+    
+    addContrato({
+      tipo: form.tipo,
+      cliente_id: form.cliente_id,
+      imovel_id: form.imovel_id,
+      valor: form.valor,
+      data_inicio: form.data_inicio,
+      prazo_meses: form.prazo_meses,
+      dia_vencimento: form.dia_vencimento,
+      indice_reajuste: form.indice_reajuste,
+      conteudo: conteudoFinal,
+      status: 'RASCUNHO',
+      versao: 1,
+      modelo_ia: modeloIA,
+      tempo_geracao_ms: tempoGeracao,
+    });
+    
+    toast({ title: 'Contrato salvo com sucesso!' });
     onOpenChange(false);
-    setStep(1);
-    setContratoGerado('');
+    resetDialog();
+  };
+
+  const handleClose = (isOpen: boolean) => {
+    if (!generating) {
+      onOpenChange(isOpen);
+      if (!isOpen) resetDialog();
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!generating) { onOpenChange(o); setStep(1); setContratoGerado(''); } }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Gerar Contrato com IA</DialogTitle></DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Gerar Contrato com IA
+          </DialogTitle>
+        </DialogHeader>
 
-        {step === 1 && (
+        {/* Step 1: Contract Type */}
+        {step === 1 && !generating && (
           <div className="space-y-4">
-            <Label>Tipo de Contrato</Label>
-            <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as TipoContrato })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{Object.entries(TIPO_CONTRATO_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button className="w-full" onClick={() => setStep(2)}>Próximo</Button>
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Selecione o tipo de contrato que deseja gerar. A IA irá criar um documento
+                profissional seguindo as normas do direito imobiliário brasileiro.
+              </p>
+            </div>
+            <div>
+              <Label>Tipo de Contrato</Label>
+              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as TipoContrato })}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TIPO_CONTRATO_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={() => setStep(2)}>
+              Próximo
+            </Button>
           </div>
         )}
 
-        {step === 2 && (
+        {/* Step 2: Client and Property */}
+        {step === 2 && !generating && (
           <div className="space-y-4">
-            <div><Label>Cliente</Label>
+            <div>
+              <Label>Cliente</Label>
               <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione o cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
-            <div><Label>Imóvel</Label>
-              <Select value={form.imovel_id} onValueChange={(v) => { const im = imoveis.find(i => i.id === v); setForm({ ...form, imovel_id: v, valor: im?.valor || 0 }); }}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{imoveis.map(i => <SelectItem key={i.id} value={i.id}>{i.titulo}</SelectItem>)}</SelectContent>
+            
+            <div>
+              <Label>Imóvel</Label>
+              <Select
+                value={form.imovel_id}
+                onValueChange={(v) => {
+                  const imovel = imoveis.find(i => i.id === v);
+                  setForm({
+                    ...form,
+                    imovel_id: v,
+                    valor: imovel?.valor || 0,
+                  });
+                }}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione o imóvel..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {imoveis.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.titulo} - {i.endereco}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2"><Button variant="outline" onClick={() => setStep(1)}>Voltar</Button><Button className="flex-1" onClick={() => setStep(3)} disabled={!form.cliente_id || !form.imovel_id}>Próximo</Button></div>
+
+            {selectedImovel && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                <p className="font-medium mb-1">Dados do Imóvel:</p>
+                <p>Proprietário: {selectedImovel.proprietario_nome}</p>
+                <p>Endereço: {selectedImovel.endereco}, {selectedImovel.bairro}</p>
+                <p>Valor: R$ {selectedImovel.valor.toLocaleString('pt-BR')}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
+              <Button
+                className="flex-1"
+                onClick={() => setStep(3)}
+                disabled={!form.cliente_id || !form.imovel_id}
+              >
+                Próximo
+              </Button>
+            </div>
           </div>
         )}
 
-        {step === 3 && (
+        {/* Step 3: Contract Details */}
+        {step === 3 && !generating && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>Data Início</Label><Input type="date" value={form.data_inicio} onChange={(e) => setForm({ ...form, data_inicio: e.target.value })} /></div>
-              <div><Label>Prazo (meses)</Label><Input type="number" value={form.prazo_meses} onChange={(e) => setForm({ ...form, prazo_meses: Number(e.target.value) })} /></div>
+              <div>
+                <Label>Data Início</Label>
+                <Input
+                  type="date"
+                  value={form.data_inicio}
+                  onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label>Prazo (meses)</Label>
+                <Input
+                  type="number"
+                  value={form.prazo_meses}
+                  onChange={(e) => setForm({ ...form, prazo_meses: Number(e.target.value) })}
+                  className="mt-2"
+                />
+              </div>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>Valor (R$)</Label><Input type="number" value={form.valor} onChange={(e) => setForm({ ...form, valor: Number(e.target.value) })} /></div>
-              <div><Label>Dia Vencimento</Label><Input type="number" value={form.dia_vencimento} onChange={(e) => setForm({ ...form, dia_vencimento: Number(e.target.value) })} /></div>
+              <div>
+                <Label>Valor (R$)</Label>
+                <Input
+                  type="number"
+                  value={form.valor}
+                  onChange={(e) => setForm({ ...form, valor: Number(e.target.value) })}
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label>Dia Vencimento</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={form.dia_vencimento}
+                  onChange={(e) => setForm({ ...form, dia_vencimento: Number(e.target.value) })}
+                  className="mt-2"
+                />
+              </div>
             </div>
-            <div><Label>Índice Reajuste</Label>
+            
+            <div>
+              <Label>Índice de Reajuste</Label>
               <Select value={form.indice_reajuste} onValueChange={(v) => setForm({ ...form, indice_reajuste: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="IGPM">IGP-M</SelectItem><SelectItem value="IPCA">IPCA</SelectItem></SelectContent>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="IGPM">IGP-M</SelectItem>
+                  <SelectItem value="IPCA">IPCA</SelectItem>
+                  <SelectItem value="INPC">INPC</SelectItem>
+                </SelectContent>
               </Select>
+            </div>
+            
+            <div className="space-y-3">
+              <Label>Cláusulas Adicionais</Label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="animais"
+                    checked={form.permite_animais}
+                    onCheckedChange={(c) => setForm({ ...form, permite_animais: !!c })}
+                  />
+                  <label htmlFor="animais" className="text-sm cursor-pointer">
+                    Permite animais de estimação
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="reformas"
+                    checked={form.permite_reformas}
+                    onCheckedChange={(c) => setForm({ ...form, permite_reformas: !!c })}
+                  />
+                  <label htmlFor="reformas" className="text-sm cursor-pointer">
+                    Permite reformas (com autorização)
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="mobiliado"
+                    checked={form.mobiliado}
+                    onCheckedChange={(c) => setForm({ ...form, mobiliado: !!c })}
+                  />
+                  <label htmlFor="mobiliado" className="text-sm cursor-pointer">
+                    Imóvel mobiliado
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label>Observações Adicionais (opcional)</Label>
+              <Textarea
+                value={form.clausulas_adicionais}
+                onChange={(e) => setForm({ ...form, clausulas_adicionais: e.target.value })}
+                placeholder="Digite cláusulas ou observações específicas..."
+                className="mt-2 min-h-[80px]"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
+              <Button className="flex-1" onClick={gerarContrato}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Gerar Contrato com IA
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Generating State */}
+        {generating && (
+          <div className="py-12 text-center space-y-6">
+            <div className="relative mx-auto w-20 h-20">
+              <Sparkles className="w-20 h-20 text-primary animate-pulse" />
+              <Loader2 className="absolute inset-0 w-20 h-20 text-primary/30 animate-spin" />
             </div>
             <div className="space-y-2">
-              <Label>Cláusulas Adicionais</Label>
-              <div className="flex items-center gap-2"><Checkbox checked={form.permite_animais} onCheckedChange={(c) => setForm({ ...form, permite_animais: !!c })} /><span className="text-sm">Permite animais</span></div>
-              <div className="flex items-center gap-2"><Checkbox checked={form.permite_reformas} onCheckedChange={(c) => setForm({ ...form, permite_reformas: !!c })} /><span className="text-sm">Permite reformas</span></div>
-              <div className="flex items-center gap-2"><Checkbox checked={form.mobiliado} onCheckedChange={(c) => setForm({ ...form, mobiliado: !!c })} /><span className="text-sm">Mobiliado</span></div>
+              <p className="font-semibold text-lg">Gerando contrato com IA...</p>
+              <p className="text-sm text-muted-foreground">
+                {progress < 30 && 'Preparando dados...'}
+                {progress >= 30 && progress < 60 && 'Analisando cláusulas jurídicas...'}
+                {progress >= 60 && progress < 85 && 'Montando documento...'}
+                {progress >= 85 && 'Finalizando...'}
+              </p>
             </div>
-            <div className="flex gap-2"><Button variant="outline" onClick={() => setStep(2)}>Voltar</Button><Button className="flex-1" onClick={gerarContrato}><Sparkles className="w-4 h-4 mr-2" />Gerar Contrato com IA</Button></div>
+            <Progress value={progress} className="w-full max-w-xs mx-auto" />
+            <Button variant="ghost" size="sm" onClick={cancelGeneration}>
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </Button>
           </div>
         )}
 
-        {generating && (
-          <div className="py-8 text-center space-y-4">
-            <Sparkles className="w-12 h-12 mx-auto text-primary animate-pulse" />
-            <p className="font-medium">IA trabalhando...</p>
-            <Progress value={progress} />
-            <p className="text-sm text-muted-foreground">{progress < 30 ? 'Carregando dados...' : progress < 60 ? 'Verificando cláusulas...' : 'Montando documento...'}</p>
-          </div>
-        )}
-
-        {step === 4 && contratoGerado && (
+        {/* Step 4: Preview and Actions */}
+        {step === 4 && contratoGerado && !generating && (
           <div className="space-y-4">
+            {/* Warning Banner */}
             <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
-              <AlertTriangle className="w-4 h-4 text-warning" />
-              <span>Este contrato foi gerado por IA e deve ser revisado por advogado.</span>
+              <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+              <span>Este contrato foi gerado por IA e deve ser revisado por um advogado antes de ser utilizado.</span>
             </div>
-            <div className="bg-muted rounded-lg p-4 max-h-96 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-sm font-mono">{contratoGerado}</pre>
+
+            {/* Info Bar */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Modelo: {modeloIA}</span>
+              <span>Gerado em {(tempoGeracao / 1000).toFixed(1)}s</span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setStep(1); setContratoGerado(''); }}>Nova Geração</Button>
-              <Button className="flex-1" onClick={salvarContrato}>Salvar Contrato</Button>
+
+            {/* Contract Preview/Edit */}
+            <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-y-auto">
+              {isEditing ? (
+                <Textarea
+                  value={editedContrato}
+                  onChange={(e) => setEditedContrato(e.target.value)}
+                  className="min-h-[350px] font-mono text-sm bg-background"
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
+                  {contratoGerado}
+                </pre>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                  } else {
+                    setEditedContrato(contratoGerado);
+                    setIsEditing(true);
+                  }
+                }}
+              >
+                {isEditing ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Concluir Edição
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Editar
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={baixarDocx}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Baixar .docx
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetDialog();
+                }}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Nova Geração
+              </Button>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={() => handleClose(false)}>
+                Fechar
+              </Button>
+              <Button className="flex-1" onClick={salvarContrato}>
+                <Check className="w-4 h-4 mr-2" />
+                Salvar Contrato
+              </Button>
             </div>
           </div>
         )}
