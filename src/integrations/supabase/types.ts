@@ -14,16 +14,582 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alertas: {
+        Row: {
+          cliente_id: string | null
+          contrato_id: string | null
+          corretor_id: string
+          created_at: string | null
+          data_alerta: string | null
+          id: string
+          imovel_id: string | null
+          lido: boolean | null
+          mensagem: string
+          prioridade: Database["public"]["Enums"]["prioridade_alerta"]
+          tipo: Database["public"]["Enums"]["tipo_alerta"]
+        }
+        Insert: {
+          cliente_id?: string | null
+          contrato_id?: string | null
+          corretor_id: string
+          created_at?: string | null
+          data_alerta?: string | null
+          id?: string
+          imovel_id?: string | null
+          lido?: boolean | null
+          mensagem: string
+          prioridade?: Database["public"]["Enums"]["prioridade_alerta"]
+          tipo: Database["public"]["Enums"]["tipo_alerta"]
+        }
+        Update: {
+          cliente_id?: string | null
+          contrato_id?: string | null
+          corretor_id?: string
+          created_at?: string | null
+          data_alerta?: string | null
+          id?: string
+          imovel_id?: string | null
+          lido?: boolean | null
+          mensagem?: string
+          prioridade?: Database["public"]["Enums"]["prioridade_alerta"]
+          tipo?: Database["public"]["Enums"]["tipo_alerta"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_imovel: {
+        Row: {
+          cliente_id: string
+          created_at: string | null
+          data_visita: string | null
+          id: string
+          imovel_id: string
+          nivel_interesse: number | null
+          observacoes: string | null
+          visitou: boolean | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string | null
+          data_visita?: string | null
+          id?: string
+          imovel_id: string
+          nivel_interesse?: number | null
+          observacoes?: string | null
+          visitou?: boolean | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string | null
+          data_visita?: string | null
+          id?: string
+          imovel_id?: string
+          nivel_interesse?: number | null
+          observacoes?: string | null
+          visitou?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_imovel_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_imovel_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes: {
+        Row: {
+          corretor_id: string
+          cpf: string | null
+          created_at: string | null
+          email: string | null
+          endereco_completo: string | null
+          estado_civil: string | null
+          id: string
+          nacionalidade: string | null
+          nome: string
+          observacoes: string | null
+          profissao: string | null
+          proximo_followup: string | null
+          rg: string | null
+          status_funil: Database["public"]["Enums"]["status_funil"]
+          telefone: string
+          tipo_interesse: Database["public"]["Enums"]["tipo_interesse"]
+          ultimo_contato: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          corretor_id: string
+          cpf?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco_completo?: string | null
+          estado_civil?: string | null
+          id?: string
+          nacionalidade?: string | null
+          nome: string
+          observacoes?: string | null
+          profissao?: string | null
+          proximo_followup?: string | null
+          rg?: string | null
+          status_funil?: Database["public"]["Enums"]["status_funil"]
+          telefone: string
+          tipo_interesse?: Database["public"]["Enums"]["tipo_interesse"]
+          ultimo_contato?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          corretor_id?: string
+          cpf?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco_completo?: string | null
+          estado_civil?: string | null
+          id?: string
+          nacionalidade?: string | null
+          nome?: string
+          observacoes?: string | null
+          profissao?: string | null
+          proximo_followup?: string | null
+          rg?: string | null
+          status_funil?: Database["public"]["Enums"]["status_funil"]
+          telefone?: string
+          tipo_interesse?: Database["public"]["Enums"]["tipo_interesse"]
+          ultimo_contato?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos: {
+        Row: {
+          arquivo_url: string | null
+          clausulas_adicionais: string[] | null
+          cliente_id: string
+          conteudo: string
+          corretor_id: string
+          created_at: string | null
+          data_inicio: string
+          dia_vencimento: number | null
+          id: string
+          imovel_id: string
+          indice_reajuste: string | null
+          modelo_ia: string | null
+          prazo_meses: number | null
+          status: string
+          tempo_geracao_ms: number | null
+          tipo: Database["public"]["Enums"]["tipo_contrato"]
+          updated_at: string | null
+          valor: number
+          versao: number | null
+        }
+        Insert: {
+          arquivo_url?: string | null
+          clausulas_adicionais?: string[] | null
+          cliente_id: string
+          conteudo: string
+          corretor_id: string
+          created_at?: string | null
+          data_inicio: string
+          dia_vencimento?: number | null
+          id?: string
+          imovel_id: string
+          indice_reajuste?: string | null
+          modelo_ia?: string | null
+          prazo_meses?: number | null
+          status?: string
+          tempo_geracao_ms?: number | null
+          tipo: Database["public"]["Enums"]["tipo_contrato"]
+          updated_at?: string | null
+          valor: number
+          versao?: number | null
+        }
+        Update: {
+          arquivo_url?: string | null
+          clausulas_adicionais?: string[] | null
+          cliente_id?: string
+          conteudo?: string
+          corretor_id?: string
+          created_at?: string | null
+          data_inicio?: string
+          dia_vencimento?: number | null
+          id?: string
+          imovel_id?: string
+          indice_reajuste?: string | null
+          modelo_ia?: string | null
+          prazo_meses?: number | null
+          status?: string
+          tempo_geracao_ms?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_contrato"]
+          updated_at?: string | null
+          valor?: number
+          versao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      corretores: {
+        Row: {
+          cnpj_cpf: string | null
+          created_at: string | null
+          creci: string
+          creci_estado: string
+          email: string
+          endereco: string | null
+          endereco_completo: string | null
+          foto_url: string | null
+          id: string
+          nome: string
+          preferencias: Json | null
+          razao_social: string | null
+          telefone: string
+          updated_at: string | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          cnpj_cpf?: string | null
+          created_at?: string | null
+          creci: string
+          creci_estado?: string
+          email: string
+          endereco?: string | null
+          endereco_completo?: string | null
+          foto_url?: string | null
+          id?: string
+          nome: string
+          preferencias?: Json | null
+          razao_social?: string | null
+          telefone: string
+          updated_at?: string | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          cnpj_cpf?: string | null
+          created_at?: string | null
+          creci?: string
+          creci_estado?: string
+          email?: string
+          endereco?: string | null
+          endereco_completo?: string | null
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          preferencias?: Json | null
+          razao_social?: string | null
+          telefone?: string
+          updated_at?: string | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      documentos: {
+        Row: {
+          arquivo_path: string | null
+          arquivo_url: string | null
+          cliente_id: string | null
+          corretor_id: string
+          created_at: string | null
+          data_validade: string | null
+          id: string
+          imovel_id: string | null
+          nome: string
+          observacoes: string | null
+          tipo: string
+          updated_at: string | null
+          validado: boolean | null
+        }
+        Insert: {
+          arquivo_path?: string | null
+          arquivo_url?: string | null
+          cliente_id?: string | null
+          corretor_id: string
+          created_at?: string | null
+          data_validade?: string | null
+          id?: string
+          imovel_id?: string | null
+          nome: string
+          observacoes?: string | null
+          tipo: string
+          updated_at?: string | null
+          validado?: boolean | null
+        }
+        Update: {
+          arquivo_path?: string | null
+          arquivo_url?: string | null
+          cliente_id?: string | null
+          corretor_id?: string
+          created_at?: string | null
+          data_validade?: string | null
+          id?: string
+          imovel_id?: string | null
+          nome?: string
+          observacoes?: string | null
+          tipo?: string
+          updated_at?: string | null
+          validado?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historico_contatos: {
+        Row: {
+          cliente_id: string
+          corretor_id: string
+          created_at: string | null
+          data: string
+          descricao: string
+          id: string
+          imovel_relacionado_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_contato"]
+        }
+        Insert: {
+          cliente_id: string
+          corretor_id: string
+          created_at?: string | null
+          data?: string
+          descricao: string
+          id?: string
+          imovel_relacionado_id?: string | null
+          tipo: Database["public"]["Enums"]["tipo_contato"]
+        }
+        Update: {
+          cliente_id?: string
+          corretor_id?: string
+          created_at?: string | null
+          data?: string
+          descricao?: string
+          id?: string
+          imovel_relacionado_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_contato"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_contatos_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_contatos_imovel_relacionado_id_fkey"
+            columns: ["imovel_relacionado_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      imoveis: {
+        Row: {
+          area_m2: number | null
+          ativo: boolean | null
+          bairro: string | null
+          cep: string | null
+          cidade: string
+          corretor_id: string
+          created_at: string | null
+          descricao: string | null
+          dormitorios: number | null
+          endereco: string
+          estado: string | null
+          exclusividade_ate: string | null
+          garagem: number | null
+          id: string
+          proprietario_cpf: string | null
+          proprietario_email: string | null
+          proprietario_nome: string
+          proprietario_telefone: string | null
+          tipo: Database["public"]["Enums"]["tipo_imovel"]
+          titulo: string
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          area_m2?: number | null
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          cidade: string
+          corretor_id: string
+          created_at?: string | null
+          descricao?: string | null
+          dormitorios?: number | null
+          endereco: string
+          estado?: string | null
+          exclusividade_ate?: string | null
+          garagem?: number | null
+          id?: string
+          proprietario_cpf?: string | null
+          proprietario_email?: string | null
+          proprietario_nome: string
+          proprietario_telefone?: string | null
+          tipo: Database["public"]["Enums"]["tipo_imovel"]
+          titulo: string
+          updated_at?: string | null
+          valor: number
+        }
+        Update: {
+          area_m2?: number | null
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string
+          corretor_id?: string
+          created_at?: string | null
+          descricao?: string | null
+          dormitorios?: number | null
+          endereco?: string
+          estado?: string | null
+          exclusividade_ate?: string | null
+          garagem?: number | null
+          id?: string
+          proprietario_cpf?: string | null
+          proprietario_email?: string | null
+          proprietario_nome?: string
+          proprietario_telefone?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_imovel"]
+          titulo?: string
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "imoveis_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_corretor_id: { Args: never; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      prioridade_alerta: "ALTA" | "MEDIA" | "BAIXA"
+      status_funil:
+        | "QUALIFICACAO"
+        | "VISITA_PROPOSTA"
+        | "DOCUMENTACAO"
+        | "FECHADO_GANHO"
+        | "FECHADO_PERDIDO"
+      tipo_alerta: "FOLLOWUP" | "DOCUMENTO" | "EXCLUSIVIDADE" | "GERAL"
+      tipo_contato:
+        | "LIGACAO"
+        | "EMAIL"
+        | "WHATSAPP"
+        | "VISITA"
+        | "PROPOSTA"
+        | "NOTA"
+      tipo_contrato:
+        | "COMPRA_VENDA"
+        | "LOCACAO_RESIDENCIAL"
+        | "LOCACAO_COMERCIAL"
+        | "EXCLUSIVIDADE_VENDA"
+        | "EXCLUSIVIDADE_LOCACAO"
+        | "DISTRATO"
+        | "PROCURACAO"
+      tipo_imovel: "APARTAMENTO" | "CASA" | "COMERCIAL" | "TERRENO"
+      tipo_interesse: "COMPRA" | "LOCACAO" | "AMBOS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +716,35 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      prioridade_alerta: ["ALTA", "MEDIA", "BAIXA"],
+      status_funil: [
+        "QUALIFICACAO",
+        "VISITA_PROPOSTA",
+        "DOCUMENTACAO",
+        "FECHADO_GANHO",
+        "FECHADO_PERDIDO",
+      ],
+      tipo_alerta: ["FOLLOWUP", "DOCUMENTO", "EXCLUSIVIDADE", "GERAL"],
+      tipo_contato: [
+        "LIGACAO",
+        "EMAIL",
+        "WHATSAPP",
+        "VISITA",
+        "PROPOSTA",
+        "NOTA",
+      ],
+      tipo_contrato: [
+        "COMPRA_VENDA",
+        "LOCACAO_RESIDENCIAL",
+        "LOCACAO_COMERCIAL",
+        "EXCLUSIVIDADE_VENDA",
+        "EXCLUSIVIDADE_LOCACAO",
+        "DISTRATO",
+        "PROCURACAO",
+      ],
+      tipo_imovel: ["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO"],
+      tipo_interesse: ["COMPRA", "LOCACAO", "AMBOS"],
+    },
   },
 } as const
