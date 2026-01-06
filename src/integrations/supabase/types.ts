@@ -557,6 +557,44 @@ export type Database = {
           },
         ]
       }
+      imovel_fotos: {
+        Row: {
+          arquivo_path: string
+          arquivo_url: string
+          created_at: string | null
+          id: string
+          imovel_id: string
+          ordem: number | null
+          principal: boolean | null
+        }
+        Insert: {
+          arquivo_path: string
+          arquivo_url: string
+          created_at?: string | null
+          id?: string
+          imovel_id: string
+          ordem?: number | null
+          principal?: boolean | null
+        }
+        Update: {
+          arquivo_path?: string
+          arquivo_url?: string
+          created_at?: string | null
+          id?: string
+          imovel_id?: string
+          ordem?: number | null
+          principal?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "imovel_fotos_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
