@@ -72,12 +72,16 @@ export interface Documento {
   id: string;
   nome: string;
   tipo: string;
+  arquivo_path?: string;
+  arquivo_url?: string;
   cliente_id?: string;
   imovel_id?: string;
+  corretor_id: string;
   validado: boolean;
   data_validade?: string;
-  arquivo_url?: string;
+  observacoes?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface HistoricoContato {

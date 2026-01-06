@@ -1,20 +1,69 @@
-import { useState } from 'react';
-import { FileText, Upload, CheckCircle, Clock, AlertTriangle, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, CheckCircle, Clock, AlertTriangle, Plus, Download, Eye, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCRMStore } from '@/stores/crmStore';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GerarContratoDialog } from '@/components/juridico/GerarContratoDialog';
+import { DocumentoUploadArea } from '@/components/juridico/DocumentoUploadArea';
+import { DocumentoViewer } from '@/components/juridico/DocumentoViewer';
+import { useDocumentos, DocumentoRow } from '@/hooks/useDocumentos';
+import { useCRMStore } from '@/stores/crmStore';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface ClienteSimples {
+  id: string;
+  nome: string;
+}
 
 export default function Juridico() {
-  const { documentos, contratos, clientes } = useCRMStore();
-  const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
+  const { contratos, clientes: clientesStore } = useCRMStore();
+  const {
+    documentos,
+    loading,
+    uploading,
+    uploadDocumento,
+    deleteDocumento,
+    getSignedUrl,
+    downloadDocumento,
+  } = useDocumentos();
 
-  const getDocumentoStatus = (doc: typeof documentos[0]) => {
+  const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<DocumentoRow | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<DocumentoRow | null>(null);
+  const [clientes, setClientes] = useState<ClienteSimples[]>([]);
+
+  // Fetch clientes from Supabase
+  useEffect(() => {
+    const fetchClientes = async () => {
+      const { data } = await supabase
+        .from('clientes')
+        .select('id, nome')
+        .order('nome');
+      if (data) {
+        setClientes(data);
+      }
+    };
+    fetchClientes();
+  }, []);
+
+  const getDocumentoStatus = (doc: DocumentoRow) => {
     if (!doc.data_validade) {
       return doc.validado ? 'validado' : 'pendente';
     }
@@ -24,10 +73,44 @@ export default function Juridico() {
     return 'validado';
   };
 
-  const getClienteNome = (clienteId?: string) => {
-    if (!clienteId) return 'Desconhecido';
+  const getClienteNome = (clienteId?: string | null) => {
+    if (!clienteId) return 'Sem cliente';
     const cliente = clientes.find((c) => c.id === clienteId);
     return cliente?.nome || 'Desconhecido';
+  };
+
+  const handleView = (doc: DocumentoRow) => {
+    setSelectedDoc(doc);
+    setViewerOpen(true);
+  };
+
+  const handleDownload = (doc: DocumentoRow) => {
+    if (doc.arquivo_path) {
+      downloadDocumento(doc.arquivo_path, doc.nome);
+    }
+  };
+
+  const handleDeleteClick = (doc: DocumentoRow) => {
+    setDocToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (docToDelete) {
+      await deleteDocumento(docToDelete.id, docToDelete.arquivo_path);
+      setDeleteDialogOpen(false);
+      setDocToDelete(null);
+    }
+  };
+
+  const handleUpload = async (
+    file: File,
+    nome: string,
+    tipo: string,
+    clienteId?: string,
+    dataValidade?: string
+  ) => {
+    await uploadDocumento(file, nome, tipo, clienteId, undefined, dataValidade);
   };
 
   return (
@@ -60,22 +143,11 @@ export default function Juridico() {
 
         <TabsContent value="documentos" className="space-y-6 mt-6">
           {/* Upload Area */}
-          <Card className="border-dashed">
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center justify-center text-center">
-                <div className="p-4 rounded-full bg-primary/10 mb-4">
-                  <Upload className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="font-medium mb-1">Arraste documentos aqui</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Formatos aceitos: PDF, JPG, PNG (máx. 10MB)
-                </p>
-                <Button variant="outline">
-                  Selecionar Arquivos
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <DocumentoUploadArea
+            clientes={clientes}
+            uploading={uploading}
+            onUpload={handleUpload}
+          />
 
           {/* Documents List */}
           <Card>
@@ -83,7 +155,25 @@ export default function Juridico() {
               <CardTitle className="text-lg">Documentos Recentes</CardTitle>
             </CardHeader>
             <CardContent>
-              {documentos.length === 0 ? (
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="w-10 h-10 rounded-lg" />
+                        <div>
+                          <Skeleton className="h-4 w-40 mb-2" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-8 w-20" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : documentos.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   Nenhum documento cadastrado ainda.
                 </p>
@@ -113,7 +203,7 @@ export default function Juridico() {
                             <p className="font-medium">{doc.nome}</p>
                             <p className="text-sm text-muted-foreground">
                               {getClienteNome(doc.cliente_id)} •{' '}
-                              {format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                              {doc.created_at && format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                             </p>
                           </div>
                         </div>
@@ -126,11 +216,33 @@ export default function Juridico() {
                           {status === 'vencido' && (
                             <Badge variant="destructive">Vencido</Badge>
                           )}
-                          <Button variant="ghost" size="sm">
-                            Ver
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            Download
+                          {doc.arquivo_path && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleView(doc)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Ver
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownload(doc)}
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Download
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteClick(doc)}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -197,6 +309,37 @@ export default function Juridico() {
         open={contratoDialogOpen}
         onOpenChange={setContratoDialogOpen}
       />
+
+      {/* Document Viewer */}
+      {selectedDoc && (
+        <DocumentoViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          nome={selectedDoc.nome}
+          arquivoPath={selectedDoc.arquivo_path}
+          getSignedUrl={getSignedUrl}
+          onDownload={downloadDocumento}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o documento "{docToDelete?.nome}"?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
