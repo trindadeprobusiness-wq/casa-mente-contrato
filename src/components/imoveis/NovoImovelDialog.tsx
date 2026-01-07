@@ -4,27 +4,81 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useCRMStore } from '@/stores/crmStore';
 import { TipoImovel } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
+import { useImovelFotos } from '@/hooks/useImovelFotos';
+import { ImovelFotosUpload } from './ImovelFotosUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NovoImovelDialogProps { open: boolean; onOpenChange: (open: boolean) => void; }
 
 export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) {
-  const { addImovel } = useCRMStore();
+  const { addImovel, fetchImoveis } = useCRMStore();
   const { toast } = useToast();
+  const { uploadMultipleFotos, uploading } = useImovelFotos();
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ titulo: '', tipo: 'APARTAMENTO' as TipoImovel, valor: 0, area_m2: 0, dormitorios: 1, garagem: 0, endereco: '', bairro: '', cidade: 'São Paulo', proprietario_nome: '' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setForm({ titulo: '', tipo: 'APARTAMENTO', valor: 0, area_m2: 0, dormitorios: 1, garagem: 0, endereco: '', bairro: '', cidade: 'São Paulo', proprietario_nome: '' });
+    setPendingFiles([]);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addImovel(form);
-    toast({ title: 'Imóvel cadastrado!' });
-    onOpenChange(false);
+    setSubmitting(true);
+
+    try {
+      // Get corretor_id
+      const { data: corretorId, error: corretorError } = await supabase.rpc('get_corretor_id');
+      if (corretorError || !corretorId) {
+        throw new Error('Não foi possível identificar o corretor');
+      }
+
+      // Create imovel in database
+      const { data: imovel, error: imovelError } = await supabase
+        .from('imoveis')
+        .insert({
+          titulo: form.titulo,
+          tipo: form.tipo,
+          valor: form.valor,
+          area_m2: form.area_m2,
+          dormitorios: form.dormitorios,
+          garagem: form.garagem,
+          endereco: form.endereco,
+          bairro: form.bairro,
+          cidade: form.cidade,
+          proprietario_nome: form.proprietario_nome,
+          corretor_id: corretorId,
+        })
+        .select()
+        .single();
+
+      if (imovelError) throw imovelError;
+
+      // Upload photos if any
+      if (pendingFiles.length > 0 && imovel) {
+        await uploadMultipleFotos(imovel.id, pendingFiles);
+      }
+
+      toast({ title: 'Imóvel cadastrado com sucesso!' });
+      resetForm();
+      onOpenChange(false);
+      fetchImoveis();
+    } catch (error: any) {
+      console.error('Erro ao cadastrar imóvel:', error);
+      toast({ title: 'Erro ao cadastrar imóvel', description: error.message, variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={open} onOpenChange={(open) => { if (!open) resetForm(); onOpenChange(open); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Novo Imóvel</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><Label>Título *</Label><Input required value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></div>
@@ -53,7 +107,25 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
             <div><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
           </div>
           <div><Label>Proprietário *</Label><Input required value={form.proprietario_nome} onChange={(e) => setForm({ ...form, proprietario_nome: e.target.value })} /></div>
-          <Button type="submit" className="w-full">Cadastrar</Button>
+          
+          <Separator />
+          
+          <div>
+            <Label className="mb-3 block">Fotos do Imóvel</Label>
+            <ImovelFotosUpload 
+              onFilesSelected={setPendingFiles} 
+              uploading={uploading}
+            />
+            {pendingFiles.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {pendingFiles.length} foto(s) serão enviadas ao salvar
+              </p>
+            )}
+          </div>
+          
+          <Button type="submit" className="w-full" disabled={submitting || uploading}>
+            {submitting ? 'Cadastrando...' : 'Cadastrar Imóvel'}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react';
-import { FileText, CheckCircle, Clock, AlertTriangle, Plus, Download, Eye, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { FileText, CheckCircle, Clock, AlertTriangle, Plus, Download, Eye, Trash2, Search, Check, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GerarContratoDialog } from '@/components/juridico/GerarContratoDialog';
@@ -30,6 +38,8 @@ interface ClienteSimples {
   nome: string;
 }
 
+type StatusFilter = 'TODOS' | 'validado' | 'pendente' | 'vencendo' | 'vencido';
+
 export default function Juridico() {
   const { contratos, clientes: clientesStore } = useCRMStore();
   const {
@@ -40,6 +50,7 @@ export default function Juridico() {
     deleteDocumento,
     getSignedUrl,
     downloadDocumento,
+    toggleValidacao,
   } = useDocumentos();
 
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
@@ -48,6 +59,11 @@ export default function Juridico() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<DocumentoRow | null>(null);
   const [clientes, setClientes] = useState<ClienteSimples[]>([]);
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('TODOS');
+  const [clienteFilter, setClienteFilter] = useState<string>('TODOS');
 
   // Fetch clientes from Supabase
   useEffect(() => {
@@ -63,14 +79,14 @@ export default function Juridico() {
     fetchClientes();
   }, []);
 
-  const getDocumentoStatus = (doc: DocumentoRow) => {
+  const getDocumentoStatus = (doc: DocumentoRow): 'validado' | 'pendente' | 'vencendo' | 'vencido' => {
     if (!doc.data_validade) {
       return doc.validado ? 'validado' : 'pendente';
     }
     const days = differenceInDays(new Date(doc.data_validade), new Date());
     if (days < 0) return 'vencido';
     if (days <= 7) return 'vencendo';
-    return 'validado';
+    return doc.validado ? 'validado' : 'pendente';
   };
 
   const getClienteNome = (clienteId?: string | null) => {
@@ -78,6 +94,22 @@ export default function Juridico() {
     const cliente = clientes.find((c) => c.id === clienteId);
     return cliente?.nome || 'Desconhecido';
   };
+
+  // Filtered documents
+  const filteredDocumentos = useMemo(() => {
+    return documentos.filter(doc => {
+      const status = getDocumentoStatus(doc);
+      const matchesStatus = statusFilter === 'TODOS' || status === statusFilter;
+      const matchesCliente = clienteFilter === 'TODOS' || 
+        (clienteFilter === 'SEM_CLIENTE' && !doc.cliente_id) ||
+        doc.cliente_id === clienteFilter;
+      const matchesSearch = !searchTerm || 
+        doc.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.tipo.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesStatus && matchesCliente && matchesSearch;
+    });
+  }, [documentos, statusFilter, clienteFilter, searchTerm]);
 
   const handleView = (doc: DocumentoRow) => {
     setSelectedDoc(doc);
@@ -111,6 +143,10 @@ export default function Juridico() {
     dataValidade?: string
   ) => {
     await uploadDocumento(file, nome, tipo, clienteId, undefined, dataValidade);
+  };
+
+  const handleToggleValidacao = (doc: DocumentoRow) => {
+    toggleValidacao(doc.id, !doc.validado);
   };
 
   return (
@@ -149,10 +185,56 @@ export default function Juridico() {
             onUpload={handleUpload}
           />
 
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome ou tipo..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODOS">Todos</SelectItem>
+                    <SelectItem value="validado">Validados</SelectItem>
+                    <SelectItem value="pendente">Pendentes</SelectItem>
+                    <SelectItem value="vencendo">Vencendo</SelectItem>
+                    <SelectItem value="vencido">Vencidos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={clienteFilter} onValueChange={setClienteFilter}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODOS">Todos os clientes</SelectItem>
+                    <SelectItem value="SEM_CLIENTE">Sem cliente</SelectItem>
+                    {clientes.map((cliente) => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Documents List */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Documentos Recentes</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Documentos</CardTitle>
+              <span className="text-sm text-muted-foreground">
+                {filteredDocumentos.length} de {documentos.length} documento(s)
+              </span>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -173,13 +255,15 @@ export default function Juridico() {
                     </div>
                   ))}
                 </div>
-              ) : documentos.length === 0 ? (
+              ) : filteredDocumentos.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  Nenhum documento cadastrado ainda.
+                  {documentos.length === 0 
+                    ? 'Nenhum documento cadastrado ainda.'
+                    : 'Nenhum documento encontrado com os filtros aplicados.'}
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {documentos.map((doc) => {
+                  {filteredDocumentos.map((doc) => {
                     const status = getDocumentoStatus(doc);
                     return (
                       <div
@@ -216,6 +300,29 @@ export default function Juridico() {
                           {status === 'vencido' && (
                             <Badge variant="destructive">Vencido</Badge>
                           )}
+                          
+                          {/* Validation toggle button */}
+                          <Button
+                            variant={doc.validado ? "outline" : "secondary"}
+                            size="sm"
+                            onClick={() => handleToggleValidacao(doc)}
+                            className={cn(
+                              doc.validado && "border-success text-success hover:text-success"
+                            )}
+                          >
+                            {doc.validado ? (
+                              <>
+                                <Check className="w-4 h-4 mr-1" />
+                                Validado
+                              </>
+                            ) : (
+                              <>
+                                <X className="w-4 h-4 mr-1" />
+                                Pendente
+                              </>
+                            )}
+                          </Button>
+
                           {doc.arquivo_path && (
                             <>
                               <Button

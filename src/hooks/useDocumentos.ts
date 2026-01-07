@@ -182,6 +182,28 @@ export function useDocumentos() {
     }
   };
 
+  const toggleValidacao = async (id: string, validado: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('documentos')
+        .update({ validado, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setDocumentos(prev =>
+        prev.map(doc =>
+          doc.id === id ? { ...doc, validado } : doc
+        )
+      );
+
+      toast.success(validado ? 'Documento validado!' : 'Validação removida');
+    } catch (error: any) {
+      console.error('Erro ao atualizar validação:', error);
+      toast.error('Erro ao atualizar validação');
+    }
+  };
+
   return {
     documentos,
     loading,
@@ -191,5 +213,6 @@ export function useDocumentos() {
     deleteDocumento,
     getSignedUrl,
     downloadDocumento,
+    toggleValidacao,
   };
 }
