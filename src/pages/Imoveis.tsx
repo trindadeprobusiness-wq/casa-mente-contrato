@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Search, Bed, Car, Ruler } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, Bed, Car, Ruler, Image } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
 import { useCRMStore } from '@/stores/crmStore';
 import { TipoImovel } from '@/types/crm';
 import { NovoImovelDialog } from '@/components/imoveis/NovoImovelDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const tipoLabels: Record<TipoImovel, string> = {
   APARTAMENTO: 'Apartamento',
@@ -27,6 +28,27 @@ export default function Imoveis() {
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [fotosPrincipais, setFotosPrincipais] = useState<Record<string, string>>({});
+
+  // Fetch main photos for all properties
+  useEffect(() => {
+    const fetchFotosPrincipais = async () => {
+      if (imoveis.length === 0) return;
+      
+      const { data } = await supabase
+        .from('imovel_fotos')
+        .select('imovel_id, arquivo_url')
+        .in('imovel_id', imoveis.map(i => i.id))
+        .eq('principal', true);
+
+      if (data) {
+        const fotosMap: Record<string, string> = {};
+        data.forEach(f => { fotosMap[f.imovel_id] = f.arquivo_url; });
+        setFotosPrincipais(fotosMap);
+      }
+    };
+    fetchFotosPrincipais();
+  }, [imoveis]);
 
   const filteredImoveis = imoveis.filter((imovel) => {
     const matchesSearch =
@@ -108,8 +130,19 @@ export default function Imoveis() {
         ) : (
           filteredImoveis.map((imovel) => (
             <Card key={imovel.id} className="hover:shadow-md transition-shadow overflow-hidden">
-              <div className="h-32 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                <span className="text-4xl opacity-30">🏢</span>
+              <div className="h-32 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center relative overflow-hidden">
+                {fotosPrincipais[imovel.id] ? (
+                  <img 
+                    src={fotosPrincipais[imovel.id]} 
+                    alt={imovel.titulo}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
+                    <Image className="w-8 h-8" />
+                    <span className="text-xs">Sem foto</span>
+                  </div>
+                )}
               </div>
               <CardContent className="p-4 space-y-3">
                 <div>

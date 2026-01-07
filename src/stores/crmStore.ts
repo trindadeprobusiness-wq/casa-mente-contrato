@@ -20,6 +20,7 @@ import {
   corretorMock,
   preferenciasMock
 } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CRMStore {
   // Data
@@ -40,6 +41,7 @@ interface CRMStore {
   // Imovel actions
   addImovel: (imovel: Omit<Imovel, 'id' | 'created_at' | 'clientes_interessados'>) => void;
   updateImovel: (id: string, data: Partial<Imovel>) => void;
+  fetchImoveis: () => Promise<void>;
   
   // Historico actions
   addHistorico: (historico: Omit<HistoricoContato, 'id' | 'created_at'>) => void;
@@ -122,6 +124,27 @@ export const useCRMStore = create<CRMStore>((set) => ({
         i.id === id ? { ...i, ...data } : i
       ),
     })),
+
+  fetchImoveis: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('imoveis')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Map to expected format with clientes_interessados
+      const imoveisFormatted = (data || []).map(i => ({
+        ...i,
+        clientes_interessados: [],
+      }));
+      
+      set({ imoveis: imoveisFormatted as Imovel[] });
+    } catch (error) {
+      console.error('Erro ao buscar imóveis:', error);
+    }
+  },
 
   addHistorico: (historico) =>
     set((state) => ({
