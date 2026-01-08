@@ -214,10 +214,10 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     }
   };
 
-  const salvarContrato = () => {
+  const salvarContrato = async () => {
     const conteudoFinal = isEditing ? editedContrato : contratoGerado;
     
-    addContrato({
+    const result = await addContrato({
       tipo: form.tipo,
       cliente_id: form.cliente_id,
       imovel_id: form.imovel_id,
@@ -233,9 +233,13 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
       tempo_geracao_ms: tempoGeracao,
     });
     
-    toast({ title: 'Contrato salvo com sucesso!' });
-    onOpenChange(false);
-    resetDialog();
+    if (result) {
+      toast({ title: 'Contrato salvo com sucesso!' });
+      onOpenChange(false);
+      resetDialog();
+    } else {
+      toast({ title: 'Erro ao salvar contrato', variant: 'destructive' });
+    }
   };
 
   const handleClose = (isOpen: boolean) => {

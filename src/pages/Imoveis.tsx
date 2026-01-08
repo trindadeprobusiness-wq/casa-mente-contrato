@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Bed, Car, Ruler, Image } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const tipoLabels: Record<TipoImovel, string> = {
 };
 
 export default function Imoveis() {
+  const navigate = useNavigate();
   const { imoveis } = useCRMStore();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
@@ -129,7 +131,11 @@ export default function Imoveis() {
           </Card>
         ) : (
           filteredImoveis.map((imovel) => (
-            <Card key={imovel.id} className="hover:shadow-md transition-shadow overflow-hidden">
+            <Card 
+              key={imovel.id} 
+              className="hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+              onClick={() => navigate(`/imoveis/${imovel.id}`)}
+            >
               <div className="h-32 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center relative overflow-hidden">
                 {fotosPrincipais[imovel.id] ? (
                   <img 

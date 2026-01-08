@@ -10,16 +10,6 @@ import {
   Corretor,
   Preferencias
 } from '@/types/crm';
-import { 
-  clientesMock, 
-  imoveisMock, 
-  alertasMock, 
-  historicoMock,
-  documentosMock,
-  contratosMock,
-  corretorMock,
-  preferenciasMock
-} from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CRMStore {
@@ -30,80 +20,234 @@ interface CRMStore {
   historico: HistoricoContato[];
   documentos: Documento[];
   contratos: Contrato[];
-  corretor: Corretor;
+  corretor: Corretor | null;
   preferencias: Preferencias;
+  loading: boolean;
 
+  // Fetch actions
+  fetchClientes: () => Promise<void>;
+  fetchImoveis: () => Promise<void>;
+  fetchContratos: () => Promise<void>;
+  fetchCorretor: () => Promise<void>;
+  fetchAlertas: () => Promise<void>;
+  fetchHistorico: (clienteId?: string) => Promise<void>;
+  
   // Cliente actions
-  addCliente: (cliente: Omit<Cliente, 'id' | 'created_at' | 'documentos' | 'imoveis_interesse'>) => void;
-  updateCliente: (id: string, data: Partial<Cliente>) => void;
-  updateClienteStatus: (id: string, status: StatusFunil) => void;
+  addCliente: (cliente: Omit<Cliente, 'id' | 'created_at' | 'documentos' | 'imoveis_interesse'>) => Promise<string | null>;
+  updateCliente: (id: string, data: Partial<Cliente>) => Promise<void>;
+  updateClienteStatus: (id: string, status: StatusFunil) => Promise<void>;
   
   // Imovel actions
   addImovel: (imovel: Omit<Imovel, 'id' | 'created_at' | 'clientes_interessados'>) => void;
   updateImovel: (id: string, data: Partial<Imovel>) => void;
-  fetchImoveis: () => Promise<void>;
   
   // Historico actions
-  addHistorico: (historico: Omit<HistoricoContato, 'id' | 'created_at'>) => void;
+  addHistorico: (historico: Omit<HistoricoContato, 'id' | 'created_at'>) => Promise<void>;
   
   // Documento actions
   addDocumento: (documento: Omit<Documento, 'id' | 'created_at'>) => void;
   
   // Alerta actions
-  marcarAlertaLido: (id: string) => void;
+  marcarAlertaLido: (id: string) => Promise<void>;
   
   // Contrato actions
-  addContrato: (contrato: Omit<Contrato, 'id' | 'created_at'>) => void;
+  addContrato: (contrato: Omit<Contrato, 'id' | 'created_at'>) => Promise<string | null>;
   updateContrato: (id: string, data: Partial<Contrato>) => void;
 
   // Vinculações
-  vincularClienteImovel: (clienteId: string, imovelId: string) => void;
+  vincularClienteImovel: (clienteId: string, imovelId: string) => Promise<void>;
 
   // Configurações actions
-  updateCorretor: (data: Partial<Corretor>) => void;
+  updateCorretor: (data: Partial<Corretor>) => Promise<void>;
   updatePreferencias: (data: Partial<Preferencias>) => void;
   updatePreferenciasNotificacoes: (data: Partial<Preferencias['notificacoes']>) => void;
 }
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const defaultPreferencias: Preferencias = {
+  notificacoes: {
+    followup_atrasado: true,
+    exclusividade_vencendo: true,
+    documento_vencendo: true,
+    novo_cliente: false,
+  },
+  antecedencia_exclusividade_dias: 7,
+  antecedencia_documento_dias: 15,
+  tema: 'light',
+  sidebar_expandida: true,
+  formato_moeda: 'completo',
+  ordenacao_clientes: 'ultimo_contato',
+};
 
-export const useCRMStore = create<CRMStore>((set) => ({
-  clientes: clientesMock,
-  imoveis: imoveisMock,
-  alertas: alertasMock,
-  historico: historicoMock,
-  documentos: documentosMock,
-  contratos: contratosMock,
-  corretor: corretorMock,
-  preferencias: preferenciasMock,
+export const useCRMStore = create<CRMStore>((set, get) => ({
+  clientes: [],
+  imoveis: [],
+  alertas: [],
+  historico: [],
+  documentos: [],
+  contratos: [],
+  corretor: null,
+  preferencias: defaultPreferencias,
+  loading: false,
 
-  addCliente: (cliente) =>
-    set((state) => ({
-      clientes: [
-        ...state.clientes,
-        {
+  fetchClientes: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const clientesFormatted = (data || []).map(c => ({
+        ...c,
+        documentos: [],
+        imoveis_interesse: [],
+      }));
+      
+      set({ clientes: clientesFormatted as Cliente[] });
+    } catch (error) {
+      console.error('Erro ao buscar clientes:', error);
+    }
+  },
+
+  fetchImoveis: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('imoveis')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const imoveisFormatted = (data || []).map(i => ({
+        ...i,
+        clientes_interessados: [],
+      }));
+      
+      set({ imoveis: imoveisFormatted as Imovel[] });
+    } catch (error) {
+      console.error('Erro ao buscar imóveis:', error);
+    }
+  },
+
+  fetchContratos: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      set({ contratos: (data || []) as Contrato[] });
+    } catch (error) {
+      console.error('Erro ao buscar contratos:', error);
+    }
+  },
+
+  fetchCorretor: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('corretores')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      
+      const prefs = data.preferencias as unknown as Preferencias | null;
+      set({ 
+        corretor: data as unknown as Corretor,
+        preferencias: prefs || defaultPreferencias,
+      });
+    } catch (error) {
+      console.error('Erro ao buscar corretor:', error);
+    }
+  },
+
+  fetchAlertas: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('alertas')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      set({ alertas: (data || []) as Alerta[] });
+    } catch (error) {
+      console.error('Erro ao buscar alertas:', error);
+    }
+  },
+
+  fetchHistorico: async (clienteId?: string) => {
+    try {
+      let query = supabase
+        .from('historico_contatos')
+        .select('*')
+        .order('data', { ascending: false });
+      
+      if (clienteId) {
+        query = query.eq('cliente_id', clienteId);
+      }
+      
+      const { data, error } = await query;
+
+      if (error) throw error;
+      set({ historico: (data || []) as HistoricoContato[] });
+    } catch (error) {
+      console.error('Erro ao buscar histórico:', error);
+    }
+  },
+
+  addCliente: async (cliente) => {
+    try {
+      const { data: corretorData } = await supabase.rpc('get_corretor_id');
+      if (!corretorData) throw new Error('Corretor não encontrado');
+
+      const { data, error } = await supabase
+        .from('clientes')
+        .insert({
           ...cliente,
-          id: generateId(),
-          created_at: new Date().toISOString(),
-          documentos: [],
-          imoveis_interesse: [],
-        },
-      ],
-    })),
+          corretor_id: corretorData,
+        })
+        .select()
+        .single();
 
-  updateCliente: (id, data) =>
-    set((state) => ({
-      clientes: state.clientes.map((c) =>
-        c.id === id ? { ...c, ...data } : c
-      ),
-    })),
+      if (error) throw error;
+      
+      get().fetchClientes();
+      return data.id;
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      return null;
+    }
+  },
 
-  updateClienteStatus: (id, status) =>
-    set((state) => ({
-      clientes: state.clientes.map((c) =>
-        c.id === id ? { ...c, status_funil: status } : c
-      ),
-    })),
+  updateCliente: async (id, data) => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+      get().fetchClientes();
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+    }
+  },
+
+  updateClienteStatus: async (id, status) => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ status_funil: status })
+        .eq('id', id);
+
+      if (error) throw error;
+      get().fetchClientes();
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+    }
+  },
 
   addImovel: (imovel) =>
     set((state) => ({
@@ -111,7 +255,7 @@ export const useCRMStore = create<CRMStore>((set) => ({
         ...state.imoveis,
         {
           ...imovel,
-          id: generateId(),
+          id: crypto.randomUUID(),
           created_at: new Date().toISOString(),
           clientes_interessados: [],
         },
@@ -125,38 +269,24 @@ export const useCRMStore = create<CRMStore>((set) => ({
       ),
     })),
 
-  fetchImoveis: async () => {
+  addHistorico: async (historico) => {
     try {
-      const { data, error } = await supabase
-        .from('imoveis')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: corretorData } = await supabase.rpc('get_corretor_id');
+      if (!corretorData) throw new Error('Corretor não encontrado');
+
+      const { error } = await supabase
+        .from('historico_contatos')
+        .insert({
+          ...historico,
+          corretor_id: corretorData,
+        });
 
       if (error) throw error;
-      
-      // Map to expected format with clientes_interessados
-      const imoveisFormatted = (data || []).map(i => ({
-        ...i,
-        clientes_interessados: [],
-      }));
-      
-      set({ imoveis: imoveisFormatted as Imovel[] });
+      get().fetchHistorico(historico.cliente_id);
     } catch (error) {
-      console.error('Erro ao buscar imóveis:', error);
+      console.error('Erro ao adicionar histórico:', error);
     }
   },
-
-  addHistorico: (historico) =>
-    set((state) => ({
-      historico: [
-        {
-          ...historico,
-          id: generateId(),
-          created_at: new Date().toISOString(),
-        },
-        ...state.historico,
-      ],
-    })),
 
   addDocumento: (documento) =>
     set((state) => ({
@@ -164,30 +294,48 @@ export const useCRMStore = create<CRMStore>((set) => ({
         ...state.documentos,
         {
           ...documento,
-          id: generateId(),
+          id: crypto.randomUUID(),
           created_at: new Date().toISOString(),
         },
       ],
     })),
 
-  marcarAlertaLido: (id) =>
-    set((state) => ({
-      alertas: state.alertas.map((a) =>
-        a.id === id ? { ...a, lido: true } : a
-      ),
-    })),
+  marcarAlertaLido: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('alertas')
+        .update({ lido: true })
+        .eq('id', id);
 
-  addContrato: (contrato) =>
-    set((state) => ({
-      contratos: [
-        ...state.contratos,
-        {
+      if (error) throw error;
+      get().fetchAlertas();
+    } catch (error) {
+      console.error('Erro ao marcar alerta como lido:', error);
+    }
+  },
+
+  addContrato: async (contrato) => {
+    try {
+      const { data: corretorData } = await supabase.rpc('get_corretor_id');
+      if (!corretorData) throw new Error('Corretor não encontrado');
+
+      const { data, error } = await supabase
+        .from('contratos')
+        .insert({
           ...contrato,
-          id: generateId(),
-          created_at: new Date().toISOString(),
-        },
-      ],
-    })),
+          corretor_id: corretorData,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      get().fetchContratos();
+      return data.id;
+    } catch (error) {
+      console.error('Erro ao adicionar contrato:', error);
+      return null;
+    }
+  },
 
   updateContrato: (id, data) =>
     set((state) => ({
@@ -196,24 +344,37 @@ export const useCRMStore = create<CRMStore>((set) => ({
       ),
     })),
 
-  vincularClienteImovel: (clienteId, imovelId) =>
-    set((state) => ({
-      clientes: state.clientes.map((c) =>
-        c.id === clienteId
-          ? { ...c, imoveis_interesse: [...new Set([...c.imoveis_interesse, imovelId])] }
-          : c
-      ),
-      imoveis: state.imoveis.map((i) =>
-        i.id === imovelId
-          ? { ...i, clientes_interessados: [...new Set([...i.clientes_interessados, clienteId])] }
-          : i
-      ),
-    })),
+  vincularClienteImovel: async (clienteId, imovelId) => {
+    try {
+      const { error } = await supabase
+        .from('cliente_imovel')
+        .insert({
+          cliente_id: clienteId,
+          imovel_id: imovelId,
+        });
 
-  updateCorretor: (data) =>
-    set((state) => ({
-      corretor: { ...state.corretor, ...data },
-    })),
+      if (error && !error.message.includes('duplicate')) throw error;
+    } catch (error) {
+      console.error('Erro ao vincular cliente ao imóvel:', error);
+    }
+  },
+
+  updateCorretor: async (data) => {
+    try {
+      const corretor = get().corretor;
+      if (!corretor) return;
+
+      const { error } = await supabase
+        .from('corretores')
+        .update(data)
+        .eq('id', corretor.id);
+
+      if (error) throw error;
+      set({ corretor: { ...corretor, ...data } as Corretor });
+    } catch (error) {
+      console.error('Erro ao atualizar corretor:', error);
+    }
+  },
 
   updatePreferencias: (data) =>
     set((state) => ({
