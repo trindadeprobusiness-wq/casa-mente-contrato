@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface ContratoRequest {
   tipo: string;
+  tipoPersonalizado?: string;
   cliente: {
     nome: string;
     cpf?: string;

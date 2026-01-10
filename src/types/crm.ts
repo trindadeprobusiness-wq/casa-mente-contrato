@@ -28,7 +28,8 @@ export type TipoContrato =
   | 'EXCLUSIVIDADE_VENDA' 
   | 'EXCLUSIVIDADE_LOCACAO' 
   | 'DISTRATO' 
-  | 'PROCURACAO';
+  | 'PROCURACAO'
+  | 'OUTRO';
 
 export type PrioridadeAlerta = 'ALTA' | 'MEDIA' | 'BAIXA';
 
@@ -149,6 +150,7 @@ export const TIPO_CONTRATO_LABELS: Record<TipoContrato, string> = {
   EXCLUSIVIDADE_LOCACAO: 'Exclusividade (Locação)',
   DISTRATO: 'Termo de Distrato',
   PROCURACAO: 'Procuração',
+  OUTRO: 'Outro (Personalizado)',
 };
 
 // Configurações do Corretor

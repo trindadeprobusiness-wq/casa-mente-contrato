@@ -16,16 +16,37 @@ import { saveAs } from "file-saver";
 interface ContractDocxOptions {
   clienteNome: string;
   tipoContrato: string;
+  marcaDagua?: string;
 }
 
 export async function generateContractDocx(
   contratoTexto: string,
   options: ContractDocxOptions
 ): Promise<void> {
-  const { clienteNome, tipoContrato } = options;
+  const { clienteNome, tipoContrato, marcaDagua } = options;
   
   // Parse contract text into sections
   const paragraphs = parseContractText(contratoTexto);
+
+  // Create watermark header if provided
+  const headerChildren: Paragraph[] = [];
+  if (marcaDagua) {
+    headerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [
+          new TextRun({
+            text: marcaDagua.toUpperCase(),
+            font: "Arial",
+            size: 72, // 36pt
+            color: "CCCCCC", // Light gray
+            bold: true,
+          }),
+        ],
+      })
+    );
+  }
 
   const doc = new Document({
     styles: {
@@ -90,7 +111,7 @@ export async function generateContractDocx(
         },
         headers: {
           default: new Header({
-            children: [],
+            children: headerChildren,
           }),
         },
         footers: {

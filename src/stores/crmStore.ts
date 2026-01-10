@@ -321,10 +321,22 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
 
       const { data, error } = await supabase
         .from('contratos')
-        .insert({
-          ...contrato,
+        .insert([{
+          tipo: contrato.tipo,
+          cliente_id: contrato.cliente_id,
+          imovel_id: contrato.imovel_id,
+          valor: contrato.valor,
+          data_inicio: contrato.data_inicio,
+          prazo_meses: contrato.prazo_meses,
+          dia_vencimento: contrato.dia_vencimento,
+          indice_reajuste: contrato.indice_reajuste,
+          conteudo: contrato.conteudo,
+          status: contrato.status,
+          versao: contrato.versao,
+          modelo_ia: contrato.modelo_ia,
+          tempo_geracao_ms: contrato.tempo_geracao_ms,
           corretor_id: corretorData,
-        })
+        }])
         .select()
         .single();
 
