@@ -322,7 +322,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       const { data, error } = await supabase
         .from('contratos')
         .insert([{
-          tipo: contrato.tipo,
+          tipo: contrato.tipo as any, // Type cast needed for new OUTRO enum value
           cliente_id: contrato.cliente_id,
           imovel_id: contrato.imovel_id,
           valor: contrato.valor,
