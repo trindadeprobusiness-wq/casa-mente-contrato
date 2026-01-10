@@ -626,6 +626,7 @@ export type Database = {
         | "EXCLUSIVIDADE_LOCACAO"
         | "DISTRATO"
         | "PROCURACAO"
+        | "OUTRO"
       tipo_imovel: "APARTAMENTO" | "CASA" | "COMERCIAL" | "TERRENO"
       tipo_interesse: "COMPRA" | "LOCACAO" | "AMBOS"
     }
@@ -780,6 +781,7 @@ export const Constants = {
         "EXCLUSIVIDADE_LOCACAO",
         "DISTRATO",
         "PROCURACAO",
+        "OUTRO",
       ],
       tipo_imovel: ["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO"],
       tipo_interesse: ["COMPRA", "LOCACAO", "AMBOS"],
