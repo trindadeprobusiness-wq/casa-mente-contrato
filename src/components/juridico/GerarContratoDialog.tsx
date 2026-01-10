@@ -22,6 +22,8 @@ interface GerarContratoDialogProps {
 
 interface FormState {
   tipo: TipoContrato;
+  tipoPersonalizado: string;
+  marcaDagua: string;
   cliente_id: string;
   imovel_id: string;
   valor: number;
@@ -51,6 +53,8 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
   
   const [form, setForm] = useState<FormState>({
     tipo: 'LOCACAO_RESIDENCIAL',
+    tipoPersonalizado: '',
+    marcaDagua: '',
     cliente_id: clienteId || '',
     imovel_id: '',
     valor: 0,
@@ -93,8 +97,13 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     }, 500);
 
     try {
+      const tipoContratoFinal = form.tipo === 'OUTRO' 
+        ? form.tipoPersonalizado 
+        : TIPO_CONTRATO_LABELS[form.tipo];
+      
       const requestBody = {
-        tipo: TIPO_CONTRATO_LABELS[form.tipo],
+        tipo: tipoContratoFinal,
+        tipoPersonalizado: form.tipo === 'OUTRO' ? form.tipoPersonalizado : undefined,
         cliente: {
           nome: selectedCliente.nome,
           telefone: selectedCliente.telefone,
@@ -193,9 +202,14 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     setDownloading(true);
     try {
       const conteudoFinal = isEditing ? editedContrato : contratoGerado;
+      const tipoContratoFinal = form.tipo === 'OUTRO' 
+        ? form.tipoPersonalizado 
+        : TIPO_CONTRATO_LABELS[form.tipo];
+      
       await generateContractDocx(conteudoFinal, {
         clienteNome: selectedCliente.nome,
-        tipoContrato: TIPO_CONTRATO_LABELS[form.tipo],
+        tipoContrato: tipoContratoFinal,
+        marcaDagua: form.marcaDagua || undefined,
       });
       
       toast({
@@ -268,9 +282,10 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 profissional seguindo as normas do direito imobiliário brasileiro.
               </p>
             </div>
+            
             <div>
               <Label>Tipo de Contrato</Label>
-              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as TipoContrato })}>
+              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as TipoContrato, tipoPersonalizado: '' })}>
                 <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>
@@ -281,7 +296,43 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-full" onClick={() => setStep(2)}>
+
+            {/* Campo personalizado quando "Outro" é selecionado */}
+            {form.tipo === 'OUTRO' && (
+              <div>
+                <Label>Descreva o Tipo de Contrato</Label>
+                <Textarea
+                  value={form.tipoPersonalizado}
+                  onChange={(e) => setForm({ ...form, tipoPersonalizado: e.target.value })}
+                  placeholder="Ex: Contrato de Comodato, Contrato de Permuta, Termo de Cessão de Direitos..."
+                  className="mt-2 min-h-[80px]"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Descreva detalhadamente o tipo de contrato que você precisa. A IA irá gerar com base nesta descrição.
+                </p>
+              </div>
+            )}
+
+            {/* Campo de Marca d'Água */}
+            <div>
+              <Label>Marca d'Água (opcional)</Label>
+              <Input
+                value={form.marcaDagua}
+                onChange={(e) => setForm({ ...form, marcaDagua: e.target.value })}
+                placeholder="Ex: MINUTA, CONFIDENCIAL, Nome da Imobiliária..."
+                className="mt-2"
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Aparecerá em todas as páginas do documento Word gerado.
+              </p>
+            </div>
+
+            <Button 
+              className="w-full" 
+              onClick={() => setStep(2)}
+              disabled={form.tipo === 'OUTRO' && !form.tipoPersonalizado.trim()}
+            >
               Próximo
             </Button>
           </div>
