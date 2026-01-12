@@ -10,9 +10,10 @@ import { Progress } from '@/components/ui/progress';
 import { useCRMStore } from '@/stores/crmStore';
 import { TipoContrato, TIPO_CONTRATO_LABELS } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, Sparkles, Download, FileText, Loader2, X, Edit3, Check } from 'lucide-react';
+import { AlertTriangle, Sparkles, Download, FileText, Loader2, X, Edit3, Check, Upload, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { generateContractDocx, formatContractForPreview } from '@/services/contractDocxService';
+import { generateContractPdf } from '@/services/contractPdfService';
 
 interface GerarContratoDialogProps {
   open: boolean;
@@ -23,7 +24,8 @@ interface GerarContratoDialogProps {
 interface FormState {
   tipo: TipoContrato;
   tipoPersonalizado: string;
-  marcaDagua: string;
+  marcaDaguaFile: File | null;
+  marcaDaguaPreview: string | null;
   cliente_id: string;
   imovel_id: string;
   valor: number;
@@ -54,7 +56,8 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
   const [form, setForm] = useState<FormState>({
     tipo: 'LOCACAO_RESIDENCIAL',
     tipoPersonalizado: '',
-    marcaDagua: '',
+    marcaDaguaFile: null,
+    marcaDaguaPreview: null,
     cliente_id: clienteId || '',
     imovel_id: '',
     valor: 0,
@@ -67,6 +70,56 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     mobiliado: false,
     clausulas_adicionais: '',
   });
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle watermark image upload
+  const handleWatermarkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Arquivo inválido',
+        description: 'Por favor, selecione uma imagem (PNG, JPG ou WEBP)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'Arquivo muito grande',
+        description: 'A imagem deve ter no máximo 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setForm({
+        ...form,
+        marcaDaguaFile: file,
+        marcaDaguaPreview: event.target?.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeWatermark = () => {
+    setForm({
+      ...form,
+      marcaDaguaFile: null,
+      marcaDaguaPreview: null,
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const selectedCliente = clientes.find(c => c.id === form.cliente_id);
   const selectedImovel = imoveis.find(i => i.id === form.imovel_id);
@@ -209,7 +262,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
       await generateContractDocx(conteudoFinal, {
         clienteNome: selectedCliente.nome,
         tipoContrato: tipoContratoFinal,
-        marcaDagua: form.marcaDagua || undefined,
+        marcaDaguaBase64: form.marcaDaguaPreview || undefined,
       });
       
       toast({
@@ -225,6 +278,38 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
       });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const baixarPdf = async () => {
+    if (!selectedCliente) return;
+    
+    setDownloadingPdf(true);
+    try {
+      const conteudoFinal = isEditing ? editedContrato : contratoGerado;
+      const tipoContratoFinal = form.tipo === 'OUTRO' 
+        ? form.tipoPersonalizado 
+        : TIPO_CONTRATO_LABELS[form.tipo];
+      
+      await generateContractPdf(conteudoFinal, {
+        clienteNome: selectedCliente.nome,
+        tipoContrato: tipoContratoFinal,
+        marcaDaguaBase64: form.marcaDaguaPreview || undefined,
+      });
+      
+      toast({
+        title: 'Download iniciado!',
+        description: 'O arquivo .pdf está sendo baixado.',
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível gerar o arquivo PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -313,19 +398,63 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
               </div>
             )}
 
-            {/* Campo de Marca d'Água */}
+            {/* Campo de Marca d'Água com Upload de Imagem */}
             <div>
-              <Label>Marca d'Água (opcional)</Label>
-              <Input
-                value={form.marcaDagua}
-                onChange={(e) => setForm({ ...form, marcaDagua: e.target.value })}
-                placeholder="Ex: MINUTA, CONFIDENCIAL, Nome da Imobiliária..."
-                className="mt-2"
-                maxLength={50}
+              <Label>Marca d'Água - Imagem (opcional)</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleWatermarkUpload}
+                className="hidden"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Aparecerá em todas as páginas do documento Word gerado.
-              </p>
+              
+              {!form.marcaDaguaPreview ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                >
+                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Clique para selecionar uma imagem
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG, WEBP - Máximo 2MB
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2 border rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded border bg-muted/50 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={form.marcaDaguaPreview}
+                        alt="Preview da marca d'água"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium truncate">
+                        {form.marcaDaguaFile?.name || 'Imagem selecionada'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {form.marcaDaguaFile ? `${(form.marcaDaguaFile.size / 1024).toFixed(1)} KB` : ''}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeWatermark}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" />
+                    A imagem aparecerá centralizada e semi-transparente no documento
+                  </p>
+                </div>
+              )}
             </div>
 
             <Button 
@@ -605,14 +734,28 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 variant="outline"
                 size="sm"
                 onClick={baixarDocx}
-                disabled={downloading}
+                disabled={downloading || downloadingPdf}
               >
                 {downloading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Download className="w-4 h-4 mr-2" />
                 )}
-                Baixar .docx
+                Baixar Word
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={baixarPdf}
+                disabled={downloading || downloadingPdf}
+              >
+                {downloadingPdf ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4 mr-2" />
+                )}
+                Baixar PDF
               </Button>
               
               <Button

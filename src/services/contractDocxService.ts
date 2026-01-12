@@ -5,47 +5,64 @@ import {
   TextRun,
   AlignmentType,
   PageNumber,
-  NumberFormat,
   Header,
   Footer,
   convertInchesToTwip,
-  BorderStyle,
+  ImageRun,
+  HorizontalPositionAlign,
+  VerticalPositionAlign,
 } from "docx";
 import { saveAs } from "file-saver";
 
 interface ContractDocxOptions {
   clienteNome: string;
   tipoContrato: string;
-  marcaDagua?: string;
+  marcaDaguaBase64?: string;
 }
 
 export async function generateContractDocx(
   contratoTexto: string,
   options: ContractDocxOptions
 ): Promise<void> {
-  const { clienteNome, tipoContrato, marcaDagua } = options;
+  const { clienteNome, tipoContrato, marcaDaguaBase64 } = options;
   
   // Parse contract text into sections
   const paragraphs = parseContractText(contratoTexto);
 
   // Create watermark header if provided
   const headerChildren: Paragraph[] = [];
-  if (marcaDagua) {
-    headerChildren.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-        children: [
-          new TextRun({
-            text: marcaDagua.toUpperCase(),
-            font: "Arial",
-            size: 72, // 36pt
-            color: "CCCCCC", // Light gray
-            bold: true,
-          }),
-        ],
-      })
-    );
+  
+  if (marcaDaguaBase64) {
+    try {
+      const imageBuffer = base64ToUint8Array(marcaDaguaBase64);
+      
+      headerChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new ImageRun({
+              data: imageBuffer,
+              transformation: {
+                width: 300,
+                height: 150,
+              },
+              floating: {
+                horizontalPosition: {
+                  align: HorizontalPositionAlign.CENTER,
+                },
+                verticalPosition: {
+                  align: VerticalPositionAlign.CENTER,
+                },
+                behindDocument: true,
+              },
+              type: "png",
+            }),
+          ],
+        })
+      );
+    } catch (error) {
+      console.error("Error adding watermark image to DOCX:", error);
+    }
   }
 
   const doc = new Document({
@@ -292,4 +309,15 @@ export function formatContractForPreview(text: string): string {
     .replace(/#{1,6}\s/g, "")
     .replace(/`/g, "")
     .trim();
+}
+
+// Helper function to convert base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+  const base64Data = base64.includes(",") ? base64.split(",")[1] : base64;
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
