@@ -51,7 +51,8 @@ export function useDocumentos() {
     tipo: string,
     clienteId?: string,
     imovelId?: string,
-    dataValidade?: string
+    dataValidade?: string,
+    observacoes?: string
   ) => {
     try {
       setUploading(true);
@@ -94,6 +95,7 @@ export function useDocumentos() {
           corretor_id: corretorId,
           validado: false,
           data_validade: dataValidade || null,
+          observacoes: observacoes || null,
         })
         .select()
         .single();
