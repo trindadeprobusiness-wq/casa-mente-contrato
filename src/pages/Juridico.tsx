@@ -217,7 +217,7 @@ export default function Juridico() {
                   <SelectContent>
                     <SelectItem value="TODOS">Todos os clientes</SelectItem>
                     <SelectItem value="SEM_CLIENTE">Sem cliente</SelectItem>
-                    {clientes.map((cliente) => (
+                    {clientes.filter(cliente => cliente.id).map((cliente) => (
                       <SelectItem key={cliente.id} value={cliente.id}>
                         {cliente.nome}
                       </SelectItem>
