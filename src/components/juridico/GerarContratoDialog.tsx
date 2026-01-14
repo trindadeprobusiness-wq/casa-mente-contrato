@@ -477,7 +477,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                   <SelectValue placeholder="Selecione o cliente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {clientes.map((c) => (
+                  {clientes.filter(c => c.id).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -501,7 +501,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                   <SelectValue placeholder="Selecione o imóvel..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {imoveis.map((i) => (
+                  {imoveis.filter(i => i.id).map((i) => (
                     <SelectItem key={i.id} value={i.id}>
                       {i.titulo} - {i.endereco}
                     </SelectItem>
