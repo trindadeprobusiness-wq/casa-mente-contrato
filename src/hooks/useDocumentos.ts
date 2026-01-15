@@ -206,6 +206,24 @@ export function useDocumentos() {
     }
   };
 
+  const updateDocumento = async (id: string, updates: Partial<Pick<DocumentoRow, 'nome' | 'tipo' | 'cliente_id' | 'imovel_id' | 'data_validade' | 'observacoes'>>) => {
+    try {
+      const { error } = await supabase
+        .from('documentos')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Documento atualizado com sucesso!');
+      await fetchDocumentos();
+    } catch (error: any) {
+      console.error('Erro ao atualizar documento:', error);
+      toast.error('Erro ao atualizar documento');
+      throw error;
+    }
+  };
+
   return {
     documentos,
     loading,
@@ -216,5 +234,6 @@ export function useDocumentos() {
     getSignedUrl,
     downloadDocumento,
     toggleValidacao,
+    updateDocumento,
   };
 }

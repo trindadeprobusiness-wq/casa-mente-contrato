@@ -595,6 +595,69 @@ export type Database = {
           },
         ]
       }
+      videos: {
+        Row: {
+          corretor_id: string
+          created_at: string
+          descricao: string | null
+          duracao_segundos: number | null
+          id: string
+          imovel_id: string | null
+          thumbnail_url: string | null
+          tipo: Database["public"]["Enums"]["tipo_video"]
+          titulo: string
+          updated_at: string
+          video_path: string
+          video_url: string
+          visualizacoes: number
+        }
+        Insert: {
+          corretor_id: string
+          created_at?: string
+          descricao?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          imovel_id?: string | null
+          thumbnail_url?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_video"]
+          titulo: string
+          updated_at?: string
+          video_path: string
+          video_url: string
+          visualizacoes?: number
+        }
+        Update: {
+          corretor_id?: string
+          created_at?: string
+          descricao?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          imovel_id?: string | null
+          thumbnail_url?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_video"]
+          titulo?: string
+          updated_at?: string
+          video_path?: string
+          video_url?: string
+          visualizacoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videos_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -629,6 +692,13 @@ export type Database = {
         | "OUTRO"
       tipo_imovel: "APARTAMENTO" | "CASA" | "COMERCIAL" | "TERRENO"
       tipo_interesse: "COMPRA" | "LOCACAO" | "AMBOS"
+      tipo_video:
+        | "TOUR_VIRTUAL"
+        | "APRESENTACAO"
+        | "DEPOIMENTO"
+        | "DRONE"
+        | "INSTITUCIONAL"
+        | "OUTRO"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -785,6 +855,14 @@ export const Constants = {
       ],
       tipo_imovel: ["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO"],
       tipo_interesse: ["COMPRA", "LOCACAO", "AMBOS"],
+      tipo_video: [
+        "TOUR_VIRTUAL",
+        "APRESENTACAO",
+        "DEPOIMENTO",
+        "DRONE",
+        "INSTITUCIONAL",
+        "OUTRO",
+      ],
     },
   },
 } as const

@@ -1,5 +1,5 @@
 import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar';
-import { Home, Users, Building2, BarChart3, Scale, Settings, Sun, Moon } from 'lucide-react';
+import { Home, Users, Building2, BarChart3, Scale, Settings, Sun, Moon, Video, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import oliverLogo from '@/assets/oliver-logo.png';
 import { cn } from '@/lib/utils';
@@ -7,9 +7,11 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { useAuth } from '@/hooks/useAuth';
 
 export function AppSidebar() {
   const [open, setOpen] = useState(false);
+  const { signOut } = useAuth();
 
   const links = [
     { label: 'Início', href: '/', icon: <Home className="h-5 w-5 flex-shrink-0" /> },
@@ -17,6 +19,7 @@ export function AppSidebar() {
     { label: 'Imóveis', href: '/imoveis', icon: <Building2 className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Funil de Vendas', href: '/funil', icon: <BarChart3 className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Jurídico', href: '/juridico', icon: <Scale className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Mídias', href: '/midias', icon: <Video className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Configurações', href: '/configuracoes', icon: <Settings className="h-5 w-5 flex-shrink-0" /> },
   ];
 
@@ -40,9 +43,10 @@ export function AppSidebar() {
             </div>
           </div>
           
-          {/* Theme Toggle Button */}
-          <div className="border-t border-sidebar-border pt-4 pb-2">
+          {/* Footer with Theme Toggle and Logout */}
+          <div className="border-t border-sidebar-border pt-4 pb-2 space-y-2">
             <ThemeToggleButton open={open} />
+            <LogoutButton open={open} onLogout={signOut} />
           </div>
         </SidebarBody>
       </Sidebar>
@@ -113,6 +117,44 @@ const ThemeToggleButton = ({ open }: { open: boolean }) => {
         </TooltipTrigger>
         <TooltipContent side="right">
           {isDark ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
+};
+
+const LogoutButton = ({ open, onLogout }: { open: boolean; onLogout: () => void }) => {
+  const button = (
+    <button
+      onClick={onLogout}
+      aria-label="Sair da conta"
+      className={cn(
+        "flex items-center gap-2 py-2 px-2 rounded-md w-full",
+        "text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive",
+        "transition-all duration-200"
+      )}
+    >
+      <LogOut className="h-5 w-5 flex-shrink-0" />
+      <motion.span
+        initial={{ opacity: 0 }}
+        animate={{ opacity: open ? 1 : 0 }}
+        className="whitespace-pre overflow-hidden"
+      >
+        Sair
+      </motion.span>
+    </button>
+  );
+
+  if (!open) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {button}
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          Sair da conta
         </TooltipContent>
       </Tooltip>
     );
