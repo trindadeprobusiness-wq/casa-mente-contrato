@@ -11,6 +11,7 @@ import { VideoUploadArea } from '@/components/midias/VideoUploadArea';
 import { VideoCard } from '@/components/midias/VideoCard';
 import { VideoPlayerDialog } from '@/components/midias/VideoPlayerDialog';
 import { EditarVideoDialog } from '@/components/midias/EditarVideoDialog';
+import { CompartilharVideoDialog } from '@/components/midias/CompartilharVideoDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ImovelSimples {
@@ -31,7 +32,7 @@ const TIPOS_VIDEO: { value: TipoVideo | 'TODOS'; label: string }[] = [
 ];
 
 export default function Midias() {
-  const { videos, loading, uploading, uploadProgress, uploadVideo, deleteVideo, updateVideo, incrementVisualizacoes } = useVideos();
+  const { videos, loading, uploading, uploadProgress, uploadVideo, deleteVideo, updateVideo, incrementVisualizacoes, getTemporaryShareUrl } = useVideos();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState<TipoVideo | 'TODOS'>('TODOS');
@@ -43,6 +44,7 @@ export default function Midias() {
   const [playerVideo, setPlayerVideo] = useState<VideoRow | null>(null);
   const [editVideo, setEditVideo] = useState<VideoRow | null>(null);
   const [deleteVideoData, setDeleteVideoData] = useState<VideoRow | null>(null);
+  const [shareVideo, setShareVideo] = useState<VideoRow | null>(null);
 
   useEffect(() => {
     const fetchImoveis = async () => {
@@ -121,6 +123,10 @@ export default function Midias() {
 
   const handleDeleteClick = (video: VideoRow) => {
     setDeleteVideoData(video);
+  };
+
+  const handleShare = (video: VideoRow) => {
+    setShareVideo(video);
   };
 
   const handleConfirmDelete = async () => {
@@ -303,6 +309,7 @@ export default function Midias() {
                   onPlay={handlePlay}
                   onEdit={handleEdit}
                   onDelete={handleDeleteClick}
+                  onShare={handleShare}
                 />
               ))}
             </div>
@@ -323,6 +330,14 @@ export default function Midias() {
         open={!!editVideo}
         onOpenChange={(open) => !open && setEditVideo(null)}
         onUpdate={updateVideo}
+      />
+
+      <CompartilharVideoDialog
+        video={shareVideo}
+        imovelNome={shareVideo ? getImovelNome(shareVideo.imovel_id) : undefined}
+        open={!!shareVideo}
+        onOpenChange={(open) => !open && setShareVideo(null)}
+        getTemporaryShareUrl={getTemporaryShareUrl}
       />
 
       <AlertDialog open={!!deleteVideoData} onOpenChange={(open) => !open && setDeleteVideoData(null)}>
