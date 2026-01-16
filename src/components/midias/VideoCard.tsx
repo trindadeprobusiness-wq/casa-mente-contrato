@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, MoreVertical, Pencil, Trash2, Link2, Eye, Building2, Video } from 'lucide-react';
+import { Play, MoreVertical, Pencil, Trash2, Link2, Eye, Building2, Video, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +21,7 @@ interface VideoCardProps {
   onPlay: (video: VideoRow) => void;
   onEdit: (video: VideoRow) => void;
   onDelete: (video: VideoRow) => void;
+  onShare: (video: VideoRow) => void;
 }
 
 const TIPO_LABELS: Record<TipoVideo, string> = {
@@ -41,7 +42,7 @@ const TIPO_CORES: Record<TipoVideo, string> = {
   OUTRO: 'bg-muted text-muted-foreground',
 };
 
-export function VideoCard({ video, imovelNome, onPlay, onEdit, onDelete }: VideoCardProps) {
+export function VideoCard({ video, imovelNome, onPlay, onEdit, onDelete, onShare }: VideoCardProps) {
   const [imageError, setImageError] = useState(false);
 
   const copyLink = () => {
@@ -138,6 +139,10 @@ export function VideoCard({ video, imovelNome, onPlay, onEdit, onDelete }: Video
               <DropdownMenuItem onClick={copyLink}>
                 <Link2 className="h-4 w-4 mr-2" />
                 Copiar Link
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onShare(video)}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Compartilhar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onEdit(video)}>

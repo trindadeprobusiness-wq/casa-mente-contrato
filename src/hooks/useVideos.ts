@@ -186,6 +186,21 @@ export function useVideos() {
     }
   };
 
+  const getTemporaryShareUrl = async (videoPath: string, expiresIn = 604800): Promise<string> => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('videos')
+        .createSignedUrl(videoPath, expiresIn);
+
+      if (error) throw error;
+      return data.signedUrl;
+    } catch (error: any) {
+      console.error('Erro ao gerar link temporário:', error);
+      toast.error('Erro ao gerar link de compartilhamento');
+      throw error;
+    }
+  };
+
   return {
     videos,
     loading,
@@ -196,5 +211,6 @@ export function useVideos() {
     deleteVideo,
     updateVideo,
     incrementVisualizacoes,
+    getTemporaryShareUrl,
   };
 }
