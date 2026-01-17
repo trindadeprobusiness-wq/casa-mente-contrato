@@ -15,6 +15,7 @@ import ImovelDetalhes from "@/pages/ImovelDetalhes";
 import FunilVendas from "@/pages/FunilVendas";
 import Juridico from "@/pages/Juridico";
 import Midias from "@/pages/Midias";
+import Financeiro from "@/pages/Financeiro";
 import Configuracoes from "@/pages/Configuracoes";
 import NotFound from "@/pages/NotFound";
 
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/imoveis" element={<Imoveis />} />
             <Route path="/imoveis/:id" element={<ImovelDetalhes />} />
             <Route path="/funil" element={<FunilVendas />} />
+            <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/juridico" element={<Juridico />} />
             <Route path="/midias" element={<Midias />} />
             <Route path="/configuracoes" element={<Configuracoes />} />

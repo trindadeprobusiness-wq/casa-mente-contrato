@@ -595,6 +595,76 @@ export type Database = {
           },
         ]
       }
+      lancamentos_financeiros: {
+        Row: {
+          categoria: Database["public"]["Enums"]["categoria_financeira"]
+          comprovante_url: string | null
+          contrato_id: string | null
+          corretor_id: string
+          created_at: string | null
+          data: string
+          descricao: string
+          id: string
+          imovel_id: string | null
+          recorrente: boolean | null
+          tipo: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          categoria: Database["public"]["Enums"]["categoria_financeira"]
+          comprovante_url?: string | null
+          contrato_id?: string | null
+          corretor_id: string
+          created_at?: string | null
+          data?: string
+          descricao: string
+          id?: string
+          imovel_id?: string | null
+          recorrente?: boolean | null
+          tipo: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at?: string | null
+          valor: number
+        }
+        Update: {
+          categoria?: Database["public"]["Enums"]["categoria_financeira"]
+          comprovante_url?: string | null
+          contrato_id?: string | null
+          corretor_id?: string
+          created_at?: string | null
+          data?: string
+          descricao?: string
+          id?: string
+          imovel_id?: string | null
+          recorrente?: boolean | null
+          tipo?: Database["public"]["Enums"]["tipo_lancamento"]
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_financeiros_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_financeiros_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_financeiros_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       videos: {
         Row: {
           corretor_id: string
@@ -666,6 +736,23 @@ export type Database = {
       get_corretor_id: { Args: never; Returns: string }
     }
     Enums: {
+      categoria_financeira:
+        | "ANUNCIO_PORTAL"
+        | "ANUNCIO_SOCIAL"
+        | "ANUNCIO_TRADICIONAL"
+        | "OPERACIONAL_ESCRITORIO"
+        | "OPERACIONAL_TRANSPORTE"
+        | "OPERACIONAL_SISTEMA"
+        | "IMPOSTO_ISS"
+        | "IMPOSTO_IR"
+        | "TAXA_BANCARIA"
+        | "COMISSAO_PARCEIRO"
+        | "COMISSAO_VENDA"
+        | "COMISSAO_LOCACAO"
+        | "TAXA_INTERMEDIACAO"
+        | "HONORARIO_AVALIACAO"
+        | "CONSULTORIA"
+        | "OUTROS"
       prioridade_alerta: "ALTA" | "MEDIA" | "BAIXA"
       status_funil:
         | "QUALIFICACAO"
@@ -692,6 +779,7 @@ export type Database = {
         | "OUTRO"
       tipo_imovel: "APARTAMENTO" | "CASA" | "COMERCIAL" | "TERRENO"
       tipo_interesse: "COMPRA" | "LOCACAO" | "AMBOS"
+      tipo_lancamento: "RECEITA" | "DESPESA"
       tipo_video:
         | "TOUR_VIRTUAL"
         | "APRESENTACAO"
@@ -826,6 +914,24 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      categoria_financeira: [
+        "ANUNCIO_PORTAL",
+        "ANUNCIO_SOCIAL",
+        "ANUNCIO_TRADICIONAL",
+        "OPERACIONAL_ESCRITORIO",
+        "OPERACIONAL_TRANSPORTE",
+        "OPERACIONAL_SISTEMA",
+        "IMPOSTO_ISS",
+        "IMPOSTO_IR",
+        "TAXA_BANCARIA",
+        "COMISSAO_PARCEIRO",
+        "COMISSAO_VENDA",
+        "COMISSAO_LOCACAO",
+        "TAXA_INTERMEDIACAO",
+        "HONORARIO_AVALIACAO",
+        "CONSULTORIA",
+        "OUTROS",
+      ],
       prioridade_alerta: ["ALTA", "MEDIA", "BAIXA"],
       status_funil: [
         "QUALIFICACAO",
@@ -855,6 +961,7 @@ export const Constants = {
       ],
       tipo_imovel: ["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO"],
       tipo_interesse: ["COMPRA", "LOCACAO", "AMBOS"],
+      tipo_lancamento: ["RECEITA", "DESPESA"],
       tipo_video: [
         "TOUR_VIRTUAL",
         "APRESENTACAO",
