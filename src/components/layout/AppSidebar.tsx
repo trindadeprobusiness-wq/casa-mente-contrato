@@ -1,5 +1,5 @@
 import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar';
-import { Home, Users, Building2, BarChart3, Scale, Settings, Sun, Moon, Video, LogOut } from 'lucide-react';
+import { Home, Users, Building2, BarChart3, Scale, Settings, Sun, Moon, Video, LogOut, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import oliverLogo from '@/assets/oliver-logo.png';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ export function AppSidebar() {
     { label: 'Clientes', href: '/clientes', icon: <Users className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Imóveis', href: '/imoveis', icon: <Building2 className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Funil de Vendas', href: '/funil', icon: <BarChart3 className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Financeiro', href: '/financeiro', icon: <Wallet className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Jurídico', href: '/juridico', icon: <Scale className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Mídias', href: '/midias', icon: <Video className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Configurações', href: '/configuracoes', icon: <Settings className="h-5 w-5 flex-shrink-0" /> },
