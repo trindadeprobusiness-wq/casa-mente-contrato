@@ -18,6 +18,7 @@ export function AppSidebar() {
     { label: 'Clientes', href: '/clientes', icon: <Users className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Imóveis', href: '/imoveis', icon: <Building2 className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Funil de Vendas', href: '/funil', icon: <BarChart3 className="h-5 w-5 flex-shrink-0" /> },
+    { label: 'Aluguéis', href: '/alugueis', icon: <Building2 className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Financeiro', href: '/financeiro', icon: <Wallet className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Jurídico', href: '/juridico', icon: <Scale className="h-5 w-5 flex-shrink-0" /> },
     { label: 'Mídias', href: '/midias', icon: <Video className="h-5 w-5 flex-shrink-0" /> },
@@ -43,7 +44,7 @@ export function AppSidebar() {
               ))}
             </div>
           </div>
-          
+
           {/* Footer with Theme Toggle and Logout */}
           <div className="border-t border-sidebar-border pt-4 pb-2 space-y-2">
             <ThemeToggleButton open={open} />

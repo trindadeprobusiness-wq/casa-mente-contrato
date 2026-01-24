@@ -68,25 +68,26 @@ export default function ImovelDetalhes() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { clientes } = useCRMStore();
-  
+
   const [imovel, setImovel] = useState<ImovelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientesInteressados, setClientesInteressados] = useState<ClienteInteressado[]>([]);
-  
+
   const { fotos, loading: loadingFotos, uploading, fetchFotos, uploadMultipleFotos, deleteFoto, setFotoPrincipal } = useImovelFotos(id);
 
   useEffect(() => {
     if (id) {
       fetchImovel();
       fetchClientesInteressados();
+      fetchFotos();
     }
-  }, [id]);
+  }, [id, fetchFotos]);
 
   const fetchImovel = async () => {
     if (!id) return;
-    
+
     setLoading(true);
     const { data, error } = await supabase
       .from('imoveis')
@@ -107,7 +108,7 @@ export default function ImovelDetalhes() {
 
   const fetchClientesInteressados = async () => {
     if (!id) return;
-    
+
     const { data } = await supabase
       .from('cliente_imovel')
       .select('cliente_id')
@@ -119,7 +120,7 @@ export default function ImovelDetalhes() {
         .from('clientes')
         .select('id, nome, telefone, status_funil')
         .in('id', clienteIds);
-      
+
       if (clientesData) {
         setClientesInteressados(clientesData);
       }
@@ -128,7 +129,7 @@ export default function ImovelDetalhes() {
 
   const handleDelete = async () => {
     if (!id) return;
-    
+
     const { error } = await supabase
       .from('imoveis')
       .delete()
@@ -146,7 +147,7 @@ export default function ImovelDetalhes() {
   const handleUploadFotos = async (files: File[]) => {
     if (!id) return;
     await uploadMultipleFotos(id, files);
-    setShowUpload(false);
+    // Don't close the uploader, allowing user to add more specific files
   };
 
   const handleDeleteFoto = async (fotoId: string, path: string) => {
@@ -231,20 +232,21 @@ export default function ImovelDetalhes() {
             Galeria de Fotos ({fotos.length})
           </CardTitle>
           <Button variant="outline" size="sm" onClick={() => setShowUpload(!showUpload)}>
-            {showUpload ? 'Cancelar' : 'Adicionar Fotos'}
+            {showUpload ? 'Cancelar/Ocultar' : 'Adicionar Fotos'}
           </Button>
         </CardHeader>
         <CardContent>
           {showUpload && (
-            <div className="mb-6">
+            <div className="mb-6 animate-in slide-in-from-top-2 fade-in duration-300">
               <ImovelFotosUpload
                 onFilesSelected={handleUploadFotos}
                 uploading={uploading}
                 maxFiles={10}
+                mode="manual"
               />
             </div>
           )}
-          
+
           {loadingFotos ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(i => (
@@ -378,8 +380,8 @@ export default function ImovelDetalhes() {
             ) : (
               <div className="space-y-3">
                 {clientesInteressados.map(cliente => (
-                  <div 
-                    key={cliente.id} 
+                  <div
+                    key={cliente.id}
                     className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
                     onClick={() => navigate(`/clientes/${cliente.id}`)}
                   >
@@ -408,7 +410,7 @@ export default function ImovelDetalhes() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Gerencie documentos na seção{' '}
-              <span 
+              <span
                 className="text-primary cursor-pointer hover:underline"
                 onClick={() => navigate('/juridico')}
               >

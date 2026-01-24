@@ -14,6 +14,7 @@ import { AlertTriangle, Sparkles, Download, FileText, Loader2, X, Edit3, Check, 
 import { supabase } from '@/integrations/supabase/client';
 import { generateContractDocx, formatContractForPreview } from '@/services/contractDocxService';
 import { generateContractPdf } from '@/services/contractPdfService';
+import { generateLocalContract } from '@/utils/contractTemplate';
 
 interface GerarContratoDialogProps {
   open: boolean;
@@ -52,7 +53,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
   const [editedContrato, setEditedContrato] = useState('');
   const [downloading, setDownloading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   const [form, setForm] = useState<FormState>({
     tipo: 'LOCACAO_RESIDENCIAL',
     tipoPersonalizado: '',
@@ -150,10 +151,10 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     }, 500);
 
     try {
-      const tipoContratoFinal = form.tipo === 'OUTRO' 
-        ? form.tipoPersonalizado 
+      const tipoContratoFinal = form.tipo === 'OUTRO'
+        ? form.tipoPersonalizado
         : TIPO_CONTRATO_LABELS[form.tipo];
-      
+
       const requestBody = {
         tipo: tipoContratoFinal,
         tipoPersonalizado: form.tipo === 'OUTRO' ? form.tipoPersonalizado : undefined,
@@ -227,14 +228,52 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
     } catch (error) {
       clearInterval(progressInterval);
       console.error('Contract generation error:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
+
+      // Fallback: Generate local contract
       toast({
-        title: 'Erro ao gerar contrato',
-        description: errorMessage,
-        variant: 'destructive',
+        title: '⚠️ Modo Offline / Fallback',
+        description: 'Não foi possível conectar à IA. Gerando contrato base localmente.',
+        // variant: 'default', // Using default to not look like a critical error
       });
+
+      const localContract = generateLocalContract({
+        tipo: form.tipo,
+        cliente: {
+          nome: selectedCliente.nome,
+          telefone: selectedCliente.telefone,
+          email: selectedCliente.email,
+        },
+        proprietario: {
+          nome: selectedImovel.proprietario_nome,
+          cpf: selectedImovel.proprietario_cpf,
+        },
+        imovel: {
+          endereco: selectedImovel.endereco,
+          bairro: selectedImovel.bairro,
+          cidade: selectedImovel.cidade,
+          tipo: selectedImovel.tipo,
+          area_m2: selectedImovel.area_m2,
+          dormitorios: selectedImovel.dormitorios,
+          garagem: selectedImovel.garagem,
+        },
+        detalhes: {
+          valor: form.valor,
+          data_inicio: form.data_inicio,
+          prazo_meses: form.prazo_meses,
+          dia_vencimento: form.dia_vencimento,
+          indice_reajuste: form.indice_reajuste,
+          permite_animais: form.permite_animais,
+          permite_reformas: form.permite_reformas,
+          mobiliado: form.mobiliado,
+          clausulas_adicionais: form.clausulas_adicionais,
+        }
+      });
+
+      setContratoGerado(localContract);
+      setEditedContrato(localContract);
+      setModeloIA('Modelo Local (Offline)');
+      setStep(4);
+      setProgress(100);
     } finally {
       setGenerating(false);
       abortControllerRef.current = null;
@@ -251,20 +290,20 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
 
   const baixarDocx = async () => {
     if (!selectedCliente) return;
-    
+
     setDownloading(true);
     try {
       const conteudoFinal = isEditing ? editedContrato : contratoGerado;
-      const tipoContratoFinal = form.tipo === 'OUTRO' 
-        ? form.tipoPersonalizado 
+      const tipoContratoFinal = form.tipo === 'OUTRO'
+        ? form.tipoPersonalizado
         : TIPO_CONTRATO_LABELS[form.tipo];
-      
+
       await generateContractDocx(conteudoFinal, {
         clienteNome: selectedCliente.nome,
         tipoContrato: tipoContratoFinal,
         marcaDaguaBase64: form.marcaDaguaPreview || undefined,
       });
-      
+
       toast({
         title: 'Download iniciado!',
         description: 'O arquivo .docx está sendo baixado.',
@@ -283,20 +322,20 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
 
   const baixarPdf = async () => {
     if (!selectedCliente) return;
-    
+
     setDownloadingPdf(true);
     try {
       const conteudoFinal = isEditing ? editedContrato : contratoGerado;
-      const tipoContratoFinal = form.tipo === 'OUTRO' 
-        ? form.tipoPersonalizado 
+      const tipoContratoFinal = form.tipo === 'OUTRO'
+        ? form.tipoPersonalizado
         : TIPO_CONTRATO_LABELS[form.tipo];
-      
+
       await generateContractPdf(conteudoFinal, {
         clienteNome: selectedCliente.nome,
         tipoContrato: tipoContratoFinal,
         marcaDaguaBase64: form.marcaDaguaPreview || undefined,
       });
-      
+
       toast({
         title: 'Download iniciado!',
         description: 'O arquivo .pdf está sendo baixado.',
@@ -315,7 +354,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
 
   const salvarContrato = async () => {
     const conteudoFinal = isEditing ? editedContrato : contratoGerado;
-    
+
     const result = await addContrato({
       tipo: form.tipo,
       cliente_id: form.cliente_id,
@@ -331,7 +370,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
       modelo_ia: modeloIA,
       tempo_geracao_ms: tempoGeracao,
     });
-    
+
     if (result) {
       toast({ title: 'Contrato salvo com sucesso!' });
       onOpenChange(false);
@@ -367,7 +406,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 profissional seguindo as normas do direito imobiliário brasileiro.
               </p>
             </div>
-            
+
             <div>
               <Label>Tipo de Contrato</Label>
               <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v as TipoContrato, tipoPersonalizado: '' })}>
@@ -408,7 +447,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 onChange={handleWatermarkUpload}
                 className="hidden"
               />
-              
+
               {!form.marcaDaguaPreview ? (
                 <div
                   onClick={() => fileInputRef.current?.click()}
@@ -457,8 +496,8 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
               )}
             </div>
 
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={() => setStep(2)}
               disabled={form.tipo === 'OUTRO' && !form.tipoPersonalizado.trim()}
             >
@@ -483,7 +522,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label>Imóvel</Label>
               <Select
@@ -555,7 +594,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 />
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Valor (R$)</Label>
@@ -578,7 +617,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 />
               </div>
             </div>
-            
+
             <div>
               <Label>Índice de Reajuste</Label>
               <Select value={form.indice_reajuste} onValueChange={(v) => setForm({ ...form, indice_reajuste: v })}>
@@ -592,7 +631,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-3">
               <Label>Cláusulas Adicionais</Label>
               <div className="space-y-2">
@@ -729,7 +768,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                   </>
                 )}
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -743,7 +782,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 )}
                 Baixar Word
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -757,7 +796,7 @@ export function GerarContratoDialog({ open, onOpenChange, clienteId }: GerarCont
                 )}
                 Baixar PDF
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"

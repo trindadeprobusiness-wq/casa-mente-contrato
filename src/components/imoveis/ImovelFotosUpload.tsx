@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Image, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -12,16 +12,25 @@ interface ImovelFotosUploadProps {
   onFilesSelected: (files: File[]) => void;
   uploading?: boolean;
   maxFiles?: number;
+  mode?: 'automatic' | 'manual';
 }
 
-export function ImovelFotosUpload({ 
-  onFilesSelected, 
+export function ImovelFotosUpload({
+  onFilesSelected,
   uploading = false,
-  maxFiles = 10 
+  maxFiles = 10,
+  mode = 'automatic'
 }: ImovelFotosUploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [previews, setPreviews] = useState<FilePreview[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Notify parent whenever previews change (ONLY in automatic mode)
+  useEffect(() => {
+    if (mode === 'automatic') {
+      onFilesSelected(previews.map(p => p.file));
+    }
+  }, [previews, onFilesSelected, mode]);
 
   const validateFile = (file: File): boolean => {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -82,7 +91,7 @@ export function ImovelFotosUpload({
     });
   };
 
-  const handleUpload = () => {
+  const handleManualUpload = () => {
     if (previews.length > 0) {
       onFilesSelected(previews.map(p => p.file));
       // Clear previews after upload starts
@@ -145,6 +154,7 @@ export function ImovelFotosUpload({
                   </div>
                 )}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     removePreview(index);
@@ -160,19 +170,21 @@ export function ImovelFotosUpload({
             <p className="text-sm text-muted-foreground">
               {previews.length} foto(s) selecionada(s) • A primeira será a foto principal
             </p>
-            <Button onClick={handleUpload} disabled={uploading}>
-              {uploading ? (
-                <>
-                  <Upload className="w-4 h-4 mr-2 animate-pulse" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Enviar Fotos
-                </>
-              )}
-            </Button>
+            {mode === 'manual' && (
+              <Button onClick={handleManualUpload} disabled={uploading}>
+                {uploading ? (
+                  <>
+                    <Upload className="w-4 h-4 mr-2 animate-pulse" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Enviar Fotos
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       )}

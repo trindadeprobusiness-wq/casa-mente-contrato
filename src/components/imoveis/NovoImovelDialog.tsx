@@ -20,10 +20,33 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
   const { uploadMultipleFotos, uploading } = useImovelFotos();
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ titulo: '', tipo: 'APARTAMENTO' as TipoImovel, valor: 0, area_m2: 0, dormitorios: 1, garagem: 0, endereco: '', bairro: '', cidade: 'São Paulo', proprietario_nome: '' });
+  // Default values set to empty strings for cleaner UX (users don't have to delete '0')
+  const [form, setForm] = useState({
+    titulo: '',
+    tipo: 'APARTAMENTO' as TipoImovel,
+    valor: '',
+    area_m2: '',
+    dormitorios: '',
+    garagem: '',
+    endereco: '',
+    bairro: '',
+    cidade: 'Anápolis', // Changed default city per request
+    proprietario_nome: ''
+  });
 
   const resetForm = () => {
-    setForm({ titulo: '', tipo: 'APARTAMENTO', valor: 0, area_m2: 0, dormitorios: 1, garagem: 0, endereco: '', bairro: '', cidade: 'São Paulo', proprietario_nome: '' });
+    setForm({
+      titulo: '',
+      tipo: 'APARTAMENTO',
+      valor: '',
+      area_m2: '',
+      dormitorios: '',
+      garagem: '',
+      endereco: '',
+      bairro: '',
+      cidade: 'Anápolis',
+      proprietario_nome: ''
+    });
     setPendingFiles([]);
   };
 
@@ -44,10 +67,10 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
         .insert({
           titulo: form.titulo,
           tipo: form.tipo,
-          valor: form.valor,
-          area_m2: form.area_m2,
-          dormitorios: form.dormitorios,
-          garagem: form.garagem,
+          valor: Number(form.valor) || 0,
+          area_m2: Number(form.area_m2) || 0,
+          dormitorios: Number(form.dormitorios) || 0,
+          garagem: Number(form.garagem) || 0,
           endereco: form.endereco,
           bairro: form.bairro,
           cidade: form.cidade,
@@ -94,12 +117,12 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Valor (R$) *</Label><Input type="number" required value={form.valor} onChange={(e) => setForm({ ...form, valor: Number(e.target.value) })} /></div>
+            <div><Label>Valor (R$) *</Label><Input type="number" required value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <div><Label>Área (m²)</Label><Input type="number" value={form.area_m2} onChange={(e) => setForm({ ...form, area_m2: Number(e.target.value) })} /></div>
-            <div><Label>Dorms</Label><Input type="number" value={form.dormitorios} onChange={(e) => setForm({ ...form, dormitorios: Number(e.target.value) })} /></div>
-            <div><Label>Vagas</Label><Input type="number" value={form.garagem} onChange={(e) => setForm({ ...form, garagem: Number(e.target.value) })} /></div>
+            <div><Label>Área (m²)</Label><Input type="number" value={form.area_m2} onChange={(e) => setForm({ ...form, area_m2: e.target.value })} /></div>
+            <div><Label>Dorms</Label><Input type="number" value={form.dormitorios} onChange={(e) => setForm({ ...form, dormitorios: e.target.value })} /></div>
+            <div><Label>Vagas</Label><Input type="number" value={form.garagem} onChange={(e) => setForm({ ...form, garagem: e.target.value })} /></div>
           </div>
           <div><Label>Endereço *</Label><Input required value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-4">
@@ -107,13 +130,13 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
             <div><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
           </div>
           <div><Label>Proprietário *</Label><Input required value={form.proprietario_nome} onChange={(e) => setForm({ ...form, proprietario_nome: e.target.value })} /></div>
-          
+
           <Separator />
-          
+
           <div>
             <Label className="mb-3 block">Fotos do Imóvel</Label>
-            <ImovelFotosUpload 
-              onFilesSelected={setPendingFiles} 
+            <ImovelFotosUpload
+              onFilesSelected={setPendingFiles}
               uploading={uploading}
             />
             {pendingFiles.length > 0 && (
@@ -122,7 +145,7 @@ export function NovoImovelDialog({ open, onOpenChange }: NovoImovelDialogProps) 
               </p>
             )}
           </div>
-          
+
           <Button type="submit" className="w-full" disabled={submitting || uploading}>
             {submitting ? 'Cadastrando...' : 'Cadastrar Imóvel'}
           </Button>

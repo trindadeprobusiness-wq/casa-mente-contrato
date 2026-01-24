@@ -17,6 +17,7 @@ import Juridico from "@/pages/Juridico";
 import Midias from "@/pages/Midias";
 import Financeiro from "@/pages/Financeiro";
 import Configuracoes from "@/pages/Configuracoes";
+import RentalManagement from "@/pages/RentalManagement";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,7 +31,7 @@ const App = () => (
         <Routes>
           {/* Public route */}
           <Route path="/auth" element={<Auth />} />
-          
+
           {/* Protected routes */}
           <Route element={
             <ProtectedRoute>
@@ -49,8 +50,9 @@ const App = () => (
             <Route path="/juridico" element={<Juridico />} />
             <Route path="/midias" element={<Midias />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/alugueis" element={<RentalManagement />} />
           </Route>
-          
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
