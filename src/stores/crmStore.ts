@@ -149,14 +149,25 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       const { data, error } = await supabase
         .from('corretores')
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) return;
       
-      const prefs = data.preferencias as unknown as Preferencias | null;
+      // Deep merge preferencias with defaults to ensure all properties exist
+      const dbPrefs = data.preferencias as unknown as Partial<Preferencias> | null;
+      const mergedPreferencias: Preferencias = {
+        ...defaultPreferencias,
+        ...dbPrefs,
+        notificacoes: {
+          ...defaultPreferencias.notificacoes,
+          ...(dbPrefs?.notificacoes || {}),
+        },
+      };
+      
       set({ 
         corretor: data as unknown as Corretor,
-        preferencias: prefs || defaultPreferencias,
+        preferencias: mergedPreferencias,
       });
     } catch (error) {
       console.error('Erro ao buscar corretor:', error);
