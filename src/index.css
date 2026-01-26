@@ -23,7 +23,8 @@
     --secondary-foreground: 215 25% 15%;
 
     --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 50%;
+    /* Updated for better legibility (was 50% lightness) */
+    --muted-foreground: 215 25% 45%;
 
     --accent: 210 40% 96%;
     --accent-foreground: 215 25% 15%;
@@ -104,8 +105,9 @@
     --critical: 0 84% 60%;
     --critical-foreground: 0 0% 100%;
 
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
+    /* Updated for better visibility */
+    --border: 220 20% 25%;
+    --input: 220 20% 25%;
     --ring: 217 91% 60%;
 
     --sidebar-background: 220 30% 6%;
@@ -114,13 +116,14 @@
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 25% 12%;
     --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 220 20% 15%;
+    --sidebar-border: 220 20% 25%;
     --sidebar-ring: 217 91% 60%;
 
-    --funnel-qualification: 217 91% 15%;
-    --funnel-visit: 38 92% 15%;
-    --funnel-documentation: 25 95% 15%;
-    --funnel-closing: 160 84% 15%;
+    /* Funnel Colors - Lightened for visibility in Dark Mode */
+    --funnel-qualification: 217 91% 30%;
+    --funnel-visit: 38 92% 30%;
+    --funnel-documentation: 25 95% 30%;
+    --funnel-closing: 160 84% 30%;
 
     --gold: 43 74% 55%;
   }
@@ -136,7 +139,7 @@
   html *,
   html *::before,
   html *::after {
-    transition: 
+    transition:
       background-color 0.3s ease,
       border-color 0.3s ease,
       color 0.3s ease,
