@@ -1,3 +1,26 @@
+export interface ContratoContent {
+    obs?: string;
+    taxa_administracao?: number;
+    dia_repasse?: number;
+    multa_atraso?: number;
+    juros_mora?: number;
+    meses_duracao?: string;
+    data_fim_calculada?: string;
+}
+
+export function parseContratoContent(conteudo: string | null): ContratoContent {
+    if (!conteudo) return {};
+    try {
+        const parsed = JSON.parse(conteudo);
+        // Handle cases where content might be just a string from legacy records
+        if (typeof parsed === 'string') return { obs: parsed };
+        return parsed;
+    } catch (e) {
+        // If not JSON, treat entire content as observation/legacy text
+        return { obs: conteudo || "" };
+    }
+}
+
 export interface ContratoLocacaoMap {
     taxa_administracao_percentual?: number;
     dia_vencimento_aluguel?: number;
