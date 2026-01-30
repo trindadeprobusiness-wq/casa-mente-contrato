@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCRMStore } from '@/stores/crmStore';
 import { STATUS_FUNIL_LABELS, TIPO_CONTATO_LABELS, StatusFunil } from '@/types/crm';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RegistrarContatoDialog } from '@/components/clientes/RegistrarContatoDialog';
 import { GerarContratoDialog } from '@/components/juridico/GerarContratoDialog';
 
@@ -44,9 +44,14 @@ const tipoContatoIcons: Record<string, React.ReactNode> = {
 export default function ClienteDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { clientes, imoveis, historico, documentos, alertas } = useCRMStore();
+  const { clientes, imoveis, historico, documentos, alertas, fetchImoveis } = useCRMStore();
   const [contatoDialogOpen, setContatoDialogOpen] = useState(false);
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
+
+  // Ensure imoveis are loaded to resolve the link
+  useEffect(() => {
+    fetchImoveis();
+  }, []);
 
   const cliente = clientes.find((c) => c.id === id);
 
@@ -256,7 +261,7 @@ export default function ClienteDetalhes() {
         onOpenChange={setContatoDialogOpen}
         clienteId={cliente.id}
       />
-      
+
       <GerarContratoDialog
         open={contratoDialogOpen}
         onOpenChange={setContratoDialogOpen}

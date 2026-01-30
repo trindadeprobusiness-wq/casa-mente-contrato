@@ -94,7 +94,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('clientes')
-        .select('*')
+        .select('*, cliente_imovel(imovel_id)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -102,7 +102,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       const clientesFormatted = (data || []).map(c => ({
         ...c,
         documentos: [],
-        imoveis_interesse: [],
+        imoveis_interesse: c.cliente_imovel?.map((ci: any) => ci.imovel_id) || [],
       }));
 
       set({ clientes: clientesFormatted as Cliente[] });
@@ -386,6 +386,13 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
 
   vincularClienteImovel: async (clienteId, imovelId) => {
     try {
+      // First, remove existing links to ensure 1:1 relationship for the UI
+      await supabase
+        .from('cliente_imovel')
+        .delete()
+        .eq('cliente_id', clienteId);
+
+      // Then insert the new link
       const { error } = await supabase
         .from('cliente_imovel')
         .insert({
@@ -394,6 +401,9 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         });
 
       if (error && !error.message.includes('duplicate')) throw error;
+
+      // Refresh the list to update UI immediately
+      get().fetchClientes();
     } catch (error) {
       console.error('Erro ao vincular cliente ao imóvel:', error);
     }

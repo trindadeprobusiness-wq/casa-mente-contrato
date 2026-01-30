@@ -38,8 +38,8 @@ export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoCli
           tipo_interesse: clienteToEdit.tipo_interesse,
           observacoes: clienteToEdit.observacoes || '',
         });
-        // Note: Editing existing link is not yet supported in this simple dialog
-        setSelectedImovel('');
+        // Pre-select the linked property if exists
+        setSelectedImovel(clienteToEdit.imoveis_interesse?.[0] || '');
       } else {
         setForm({ nome: '', telefone: '', email: '', tipo_interesse: 'COMPRA', observacoes: '' });
         setSelectedImovel('');
@@ -47,30 +47,62 @@ export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoCli
     }
   }, [open, clienteToEdit]);
 
+  // Phone mask function
+  const maskPhone = (value: string) => {
+    return value
+      .replace(/\D/g, '')
+      .replace(/^(\d{2})(\d)/g, '($1) $2')
+      .replace(/(\d)(\d{4})$/, '$1-$2')
+      .slice(0, 15);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
-    if (clienteToEdit) {
-      await updateCliente(clienteToEdit.id, form);
-      if (selectedImovel) {
-        await vincularClienteImovel(clienteToEdit.id, selectedImovel);
-      }
-      toast({ title: 'Cliente atualizado com sucesso!' });
-    } else {
-      const newId = await addCliente({
-        ...form,
-        status_funil: 'QUALIFICACAO' as StatusFunil,
-        ultimo_contato: new Date().toISOString()
+    setIsSubmitting(true);
+
+    // Custom Email Validation
+    if (form.email && !form.email.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Email inválido",
+        description: "Por favor, insira um endereço de email válido contendo '@'."
       });
-
-      if (newId && selectedImovel) {
-        await vincularClienteImovel(newId, selectedImovel);
-      }
-
-      toast({ title: 'Cliente cadastrado com sucesso!' });
+      setIsSubmitting(false);
+      return;
     }
 
-    onOpenChange(false);
+    try {
+      if (clienteToEdit) {
+        await updateCliente(clienteToEdit.id, form);
+        if (selectedImovel) {
+          await vincularClienteImovel(clienteToEdit.id, selectedImovel);
+        }
+        toast({ title: 'Cliente atualizado com sucesso!' });
+      } else {
+        const newId = await addCliente({
+          ...form,
+          status_funil: 'QUALIFICACAO' as StatusFunil,
+          ultimo_contato: new Date().toISOString()
+        });
+
+        if (newId && selectedImovel) {
+          await vincularClienteImovel(newId, selectedImovel);
+        }
+
+        toast({ title: 'Cliente cadastrado com sucesso!' });
+      }
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast({ variant: "destructive", title: "Erro ao salvar" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -84,8 +116,17 @@ export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoCli
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><Label>Nome *</Label><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-          <div><Label>Telefone *</Label><Input required value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
-          <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+          <div>
+            <Label>Telefone *</Label>
+            <Input
+              required
+              value={form.telefone}
+              onChange={(e) => setForm({ ...form, telefone: maskPhone(e.target.value) })}
+              placeholder="(00) 00000-0000"
+              maxLength={15}
+            />
+          </div>
+          <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="exemplo@email.com" /></div>
 
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Interesse</Label>
@@ -117,7 +158,9 @@ export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoCli
           </div>
 
           <div><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
-          <Button type="submit" className="w-full">{clienteToEdit ? 'Salvar Alterações' : 'Cadastrar'}</Button>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Salvando...' : (clienteToEdit ? 'Salvar Alterações' : 'Cadastrar')}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
