@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { 
-  Cliente, 
-  Imovel, 
-  Alerta, 
-  HistoricoContato, 
+import {
+  Cliente,
+  Imovel,
+  Alerta,
+  HistoricoContato,
   Documento,
   Contrato,
   StatusFunil,
@@ -31,25 +31,26 @@ interface CRMStore {
   fetchCorretor: () => Promise<void>;
   fetchAlertas: () => Promise<void>;
   fetchHistorico: (clienteId?: string) => Promise<void>;
-  
+
   // Cliente actions
   addCliente: (cliente: Omit<Cliente, 'id' | 'created_at' | 'documentos' | 'imoveis_interesse'>) => Promise<string | null>;
   updateCliente: (id: string, data: Partial<Cliente>) => Promise<void>;
   updateClienteStatus: (id: string, status: StatusFunil) => Promise<void>;
-  
+  removeCliente: (id: string) => Promise<{ success: boolean; error?: any }>;
+
   // Imovel actions
   addImovel: (imovel: Omit<Imovel, 'id' | 'created_at' | 'clientes_interessados'>) => void;
   updateImovel: (id: string, data: Partial<Imovel>) => void;
-  
+
   // Historico actions
   addHistorico: (historico: Omit<HistoricoContato, 'id' | 'created_at'>) => Promise<void>;
-  
+
   // Documento actions
   addDocumento: (documento: Omit<Documento, 'id' | 'created_at'>) => void;
-  
+
   // Alerta actions
   marcarAlertaLido: (id: string) => Promise<void>;
-  
+
   // Contrato actions
   addContrato: (contrato: Omit<Contrato, 'id' | 'created_at'>) => Promise<string | null>;
   updateContrato: (id: string, data: Partial<Contrato>) => void;
@@ -97,13 +98,13 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       const clientesFormatted = (data || []).map(c => ({
         ...c,
         documentos: [],
         imoveis_interesse: [],
       }));
-      
+
       set({ clientes: clientesFormatted as Cliente[] });
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
@@ -118,12 +119,12 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       const imoveisFormatted = (data || []).map(i => ({
         ...i,
         clientes_interessados: [],
       }));
-      
+
       set({ imoveis: imoveisFormatted as Imovel[] });
     } catch (error) {
       console.error('Erro ao buscar imóveis:', error);
@@ -153,7 +154,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
 
       if (error) throw error;
       if (!data) return;
-      
+
       // Deep merge preferencias with defaults to ensure all properties exist
       const dbPrefs = data.preferencias as unknown as Partial<Preferencias> | null;
       const mergedPreferencias: Preferencias = {
@@ -164,8 +165,8 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
           ...(dbPrefs?.notificacoes || {}),
         },
       };
-      
-      set({ 
+
+      set({
         corretor: data as unknown as Corretor,
         preferencias: mergedPreferencias,
       });
@@ -194,11 +195,11 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         .from('historico_contatos')
         .select('*')
         .order('data', { ascending: false });
-      
+
       if (clienteId) {
         query = query.eq('cliente_id', clienteId);
       }
-      
+
       const { data, error } = await query;
 
       if (error) throw error;
@@ -223,7 +224,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         .single();
 
       if (error) throw error;
-      
+
       get().fetchClientes();
       return data.id;
     } catch (error) {
@@ -257,6 +258,22 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       get().fetchClientes();
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
+    }
+  },
+
+  removeCliente: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      get().fetchClientes();
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao remover cliente:', error);
+      return { success: false, error };
     }
   },
 

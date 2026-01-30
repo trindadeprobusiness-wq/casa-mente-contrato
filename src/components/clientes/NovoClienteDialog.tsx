@@ -1,52 +1,123 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useCRMStore } from '@/stores/crmStore';
-import { TipoInteresse, StatusFunil } from '@/types/crm';
+import { TipoInteresse, StatusFunil, Cliente } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
 
 interface NovoClienteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  clienteToEdit?: Cliente | null;
 }
 
-export function NovoClienteDialog({ open, onOpenChange }: NovoClienteDialogProps) {
-  const { addCliente } = useCRMStore();
+export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoClienteDialogProps) {
+  const { addCliente, updateCliente, imoveis, fetchImoveis, vincularClienteImovel } = useCRMStore();
   const { toast } = useToast();
-  const [form, setForm] = useState({ nome: '', telefone: '', email: '', tipo_interesse: 'COMPRA' as TipoInteresse, observacoes: '' });
+  const [form, setForm] = useState({
+    nome: '',
+    telefone: '',
+    email: '',
+    tipo_interesse: 'COMPRA' as TipoInteresse,
+    observacoes: ''
+  });
+  const [selectedImovel, setSelectedImovel] = useState<string>('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (open) {
+      fetchImoveis();
+      if (clienteToEdit) {
+        setForm({
+          nome: clienteToEdit.nome,
+          telefone: clienteToEdit.telefone,
+          email: clienteToEdit.email || '',
+          tipo_interesse: clienteToEdit.tipo_interesse,
+          observacoes: clienteToEdit.observacoes || '',
+        });
+        // Note: Editing existing link is not yet supported in this simple dialog
+        setSelectedImovel('');
+      } else {
+        setForm({ nome: '', telefone: '', email: '', tipo_interesse: 'COMPRA', observacoes: '' });
+        setSelectedImovel('');
+      }
+    }
+  }, [open, clienteToEdit]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addCliente({ ...form, status_funil: 'QUALIFICACAO' as StatusFunil, ultimo_contato: new Date().toISOString() });
-    toast({ title: 'Cliente cadastrado com sucesso!' });
-    setForm({ nome: '', telefone: '', email: '', tipo_interesse: 'COMPRA', observacoes: '' });
+
+    if (clienteToEdit) {
+      await updateCliente(clienteToEdit.id, form);
+      if (selectedImovel) {
+        await vincularClienteImovel(clienteToEdit.id, selectedImovel);
+      }
+      toast({ title: 'Cliente atualizado com sucesso!' });
+    } else {
+      const newId = await addCliente({
+        ...form,
+        status_funil: 'QUALIFICACAO' as StatusFunil,
+        ultimo_contato: new Date().toISOString()
+      });
+
+      if (newId && selectedImovel) {
+        await vincularClienteImovel(newId, selectedImovel);
+      }
+
+      toast({ title: 'Cliente cadastrado com sucesso!' });
+    }
+
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Novo Cliente</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{clienteToEdit ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+          <DialogDescription>
+            {clienteToEdit ? 'Atualize os dados do cliente abaixo.' : 'Preencha os dados para cadastrar um novo cliente.'}
+          </DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><Label>Nome *</Label><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
           <div><Label>Telefone *</Label><Input required value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
           <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div><Label>Interesse</Label>
-            <Select value={form.tipo_interesse} onValueChange={(v) => setForm({ ...form, tipo_interesse: v as TipoInteresse })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="COMPRA">Compra</SelectItem>
-                <SelectItem value="LOCACAO">Locação</SelectItem>
-                <SelectItem value="AMBOS">Ambos</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Interesse</Label>
+              <Select value={form.tipo_interesse} onValueChange={(v) => setForm({ ...form, tipo_interesse: v as TipoInteresse })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPRA">Compra</SelectItem>
+                  <SelectItem value="LOCACAO">Locação</SelectItem>
+                  <SelectItem value="AMBOS">Ambos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div><Label>Imóvel de Interesse</Label>
+              <Select value={selectedImovel} onValueChange={setSelectedImovel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {imoveis.map(imovel => (
+                    <SelectItem key={imovel.id} value={imovel.id}>
+                      {imovel.titulo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
           <div><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
-          <Button type="submit" className="w-full">Cadastrar</Button>
+          <Button type="submit" className="w-full">{clienteToEdit ? 'Salvar Alterações' : 'Cadastrar'}</Button>
         </form>
       </DialogContent>
     </Dialog>
