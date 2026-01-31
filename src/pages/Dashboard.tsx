@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { useEffect } from 'react';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, ArrowRight, Users, Building2, FileText, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +11,14 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
-  const { clientes, alertas, imoveis } = useCRMStore();
-  
+  const { clientes, alertas, imoveis, corretor, fetchCorretor } = useCRMStore();
+
+  useEffect(() => {
+    fetchCorretor();
+  }, []);
+
   const alertasNaoLidos = alertas.filter(a => !a.lido);
-  
+
   const funnelCounts = {
     qualificacao: clientes.filter(c => c.status_funil === 'QUALIFICACAO').length,
     visitaProposta: clientes.filter(c => c.status_funil === 'VISITA_PROPOSTA').length,
@@ -28,7 +33,7 @@ export default function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">
-          Bem-vindo, {corretorMock.nome}
+          Bem-vindo, {corretor?.nome || 'Corretor'}
         </h1>
         <p className="text-muted-foreground capitalize">{hoje}</p>
       </div>
@@ -197,8 +202,8 @@ export default function Dashboard() {
                 </div>
                 <Badge variant={
                   cliente.status_funil === 'FECHADO_GANHO' ? 'default' :
-                  cliente.status_funil === 'DOCUMENTACAO' ? 'secondary' :
-                  'outline'
+                    cliente.status_funil === 'DOCUMENTACAO' ? 'secondary' :
+                      'outline'
                 }>
                   {cliente.status_funil === 'QUALIFICACAO' && 'Qualificação'}
                   {cliente.status_funil === 'VISITA_PROPOSTA' && 'Visita'}
@@ -227,8 +232,8 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium">{imovel.titulo}</p>
                   <p className="text-sm text-muted-foreground">
-                    {imovel.bairro} • {imovel.valor > 10000 
-                      ? `R$ ${(imovel.valor / 1000).toFixed(0)}k` 
+                    {imovel.bairro} • {imovel.valor > 10000
+                      ? `R$ ${(imovel.valor / 1000).toFixed(0)}k`
                       : `R$ ${imovel.valor.toLocaleString('pt-BR')}/mês`
                     }
                   </p>
