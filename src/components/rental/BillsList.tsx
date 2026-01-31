@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Plus, CalendarClock } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Plus, CalendarClock, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { FaturaAluguel } from "@/types/rental";
 import { BillDialog } from "./BillDialog";
+import { GenerateMessageDialog } from "./GenerateMessageDialog";
 
 export function BillsList() {
     const queryClient = useQueryClient();
@@ -25,6 +26,10 @@ export function BillsList() {
     // Manual Bill Management
     const [isBillDialogOpen, setIsBillDialogOpen] = useState(false);
     const [billToEdit, setBillToEdit] = useState<any>(null);
+
+    // AI Message Generator
+    const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+    const [messageBill, setMessageBill] = useState<any>(null);
 
     // Fetch Bills
     const { data: bills, isLoading, isRefetching, error } = useQuery({
@@ -227,10 +232,19 @@ export function BillsList() {
                                         </TableCell>
                                         <TableCell>{getStatusBadge(bill.status, bill.asaas_status)}</TableCell>
                                         <TableCell className="text-right flex justify-end gap-2 text-xs">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                                onClick={() => { setMessageBill(bill); setIsMessageDialogOpen(true); }}
+                                                title="Gerar Mensagem com IA"
+                                            >
+                                                <Wand2 className="h-3.5 w-3.5" />
+                                            </Button>
                                             {bill.recibo_url && (
                                                 <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
                                                     <a href={bill.recibo_url} target="_blank" rel="noopener noreferrer">
-                                                        <FileText className="mr-1 h-3 w-3" /> Ver Recibo
+                                                        <FileText className="mr-1 h-3 w-3" />
                                                     </a>
                                                 </Button>
                                             )}
@@ -296,6 +310,13 @@ export function BillsList() {
                 open={isBillDialogOpen}
                 onOpenChange={setIsBillDialogOpen}
                 billToEdit={billToEdit}
+            />
+
+            <GenerateMessageDialog
+                open={isMessageDialogOpen}
+                onOpenChange={setIsMessageDialogOpen}
+                bill={messageBill}
+                clientName={messageBill?.clientes?.nome}
             />
         </Card>
     );

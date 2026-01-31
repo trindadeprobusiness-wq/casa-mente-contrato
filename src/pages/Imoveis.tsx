@@ -30,13 +30,14 @@ export default function Imoveis() {
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [imovelToEdit, setImovelToEdit] = useState<any>(null);
   const [fotosPrincipais, setFotosPrincipais] = useState<Record<string, string>>({});
 
   // Fetch main photos for all properties
   useEffect(() => {
     const fetchFotosPrincipais = async () => {
       if (imoveis.length === 0) return;
-      
+
       const { data } = await supabase
         .from('imovel_fotos')
         .select('imovel_id, arquivo_url')
@@ -131,15 +132,15 @@ export default function Imoveis() {
           </Card>
         ) : (
           filteredImoveis.map((imovel) => (
-            <Card 
-              key={imovel.id} 
+            <Card
+              key={imovel.id}
               className="hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
               onClick={() => navigate(`/imoveis/${imovel.id}`)}
             >
               <div className="h-32 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center relative overflow-hidden">
                 {fotosPrincipais[imovel.id] ? (
-                  <img 
-                    src={fotosPrincipais[imovel.id]} 
+                  <img
+                    src={fotosPrincipais[imovel.id]}
                     alt={imovel.titulo}
                     className="w-full h-full object-cover"
                   />
@@ -193,13 +194,33 @@ export default function Imoveis() {
                     {imovel.clientes_interessados.length} interessados
                   </span>
                 </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImovelToEdit(imovel);
+                    setDialogOpen(true);
+                  }}
+                >
+                  Editar
+                </Button>
               </CardContent>
             </Card>
           ))
         )}
       </div>
 
-      <NovoImovelDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <NovoImovelDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setImovelToEdit(null);
+        }}
+        imovelToEdit={imovelToEdit}
+      />
     </div>
   );
 }

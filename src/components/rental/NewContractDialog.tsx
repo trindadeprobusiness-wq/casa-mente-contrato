@@ -12,14 +12,17 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 
 import { ContractUpload } from "./ContractUpload";
+import { parseContratoContent } from "@/types/rental";
 
 interface NewContractDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    contractToEdit?: any; // Added prop for editing
 }
 
-export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps) {
+export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewContractDialogProps) {
     const queryClient = useQueryClient();
+    const isEditing = !!contractToEdit;
 
     // Form States
     const [clientId, setClientId] = useState("");
@@ -31,6 +34,29 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
     const [payoutDay, setPayoutDay] = useState("15");
     const [duration, setDuration] = useState("30"); // Months
     const [contractFile, setContractFile] = useState<File | null>(null);
+
+    // Populate form when editing
+    useEffect(() => {
+        if (contractToEdit && open) {
+            setClientId(contractToEdit.cliente_id || "");
+            setPropertyId(contractToEdit.imovel_id || "");
+            setRentValue(contractToEdit.valor?.toString() || "");
+            setStartDate(contractToEdit.data_inicio ? contractToEdit.data_inicio.split('T')[0] : "");
+            setDueDay(contractToEdit.dia_vencimento?.toString() || "10");
+
+            const content = parseContratoContent(contractToEdit.conteudo);
+            setAdminFee(content.taxa_administracao?.toString() || contractToEdit.taxa_administracao_percentual?.toString() || "10");
+            setPayoutDay(content.dia_repasse?.toString() || "15");
+            setDuration(content.meses_duracao?.toString() || "30");
+        } else if (!open && !contractToEdit) {
+            // Reset if closing and not editing (keep reset logic simple)
+            setRentValue("");
+            setClientId("");
+            setPropertyId("");
+            setContractFile(null);
+            setStartDate("");
+        }
+    }, [contractToEdit, open]);
 
     // Fetch Clients
     const { data: clients } = useQuery({
@@ -46,6 +72,9 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
         queryKey: ["properties-select"],
         queryFn: async () => {
             const { data } = await supabase.from("imoveis").select("id, titulo, proprietario_nome, endereco").eq("ativo", true).order("titulo");
+
+            // If editing, we might need to include the current property even if it's inactive (though here we just list active ones)
+            // For now assuming the property attached to the contract is still fetchable or present in this list if active.
             return data || [];
         }
     });
@@ -59,7 +88,7 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
     const netVal = rent - feeVal;
 
     // Mutation
-    const createContractMutation = useMutation({
+    const upsertContractMutation = useMutation({
         mutationFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Usuário não autenticado");
@@ -67,8 +96,7 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
             const { data: corretor } = await supabase.from("corretores").select("id").eq("user_id", user.id).single();
             if (!corretor) throw new Error("Perfil de corretor não encontrado");
 
-            let arquivoPath = null;
-            let arquivoUrl = null;
+            let arquivoPath = contractToEdit?.arquivo_url; // Default to existing path if editing
 
             if (contractFile) {
                 const fileExt = contractFile.name.split('.').pop();
@@ -82,7 +110,6 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
                 if (uploadError) throw new Error("Erro ao fazer upload do contrato: " + uploadError.message);
 
                 arquivoPath = filePath;
-                arquivoUrl = filePath;
             }
 
             // Estimate end date
@@ -90,51 +117,76 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
             const end = new Date(start);
             end.setMonth(end.getMonth() + parseInt(duration));
 
-            const { data: contract, error } = await supabase.from("contratos").insert({
+            const contractData = {
                 corretor_id: corretor.id,
                 cliente_id: clientId,
                 imovel_id: propertyId,
                 tipo: 'LOCACAO_RESIDENCIAL',
                 valor: rent,
                 data_inicio: startDate || new Date().toISOString(),
-                // data_fim removed as column likely doesn't exist
                 dia_vencimento: parseInt(dueDay),
                 conteudo: JSON.stringify({
-                    obs: "Contrato Gerado Manualmente",
+                    obs: "Contrato Gerado/Atualizado Manualmente",
                     dia_repasse: parseInt(payoutDay),
                     taxa_administracao: feePct,
                     meses_duracao: duration,
                     data_fim_calculada: end.toISOString()
                 }),
                 status: 'ATIVO',
-                arquivo_url: arquivoUrl // Storing the path here
-            }).select().single();
+                arquivo_url: arquivoPath
+            };
 
-            if (error) throw error;
+            let result;
 
-            // Generate first bill
-            // @ts-ignore
-            await supabase.rpc('generate_monthly_rent_bills', { reference_date: new Date().toISOString() });
+            if (isEditing && contractToEdit) {
+                // Update
+                const { data, error } = await supabase
+                    .from("contratos")
+                    .update(contractData)
+                    .eq("id", contractToEdit.id)
+                    .select()
+                    .single();
 
-            return contract;
+                if (error) throw error;
+                result = data;
+                toast.success("Contrato atualizado com sucesso!");
+            } else {
+                // Insert
+                const { data, error } = await supabase
+                    .from("contratos")
+                    .insert(contractData)
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                result = data;
+                toast.success("Contrato criado com sucesso!", {
+                    description: "Faturas iniciais geradas e contrato ativo."
+                });
+
+                // Generate first bill ONLY for new contracts to avoid dupes/confusion on edit
+                // @ts-ignore
+                await supabase.rpc('generate_monthly_rent_bills', { reference_date: new Date().toISOString() });
+            }
+
+            return result;
         },
         onSuccess: () => {
-            toast.success("Contrato criado com sucesso!", {
-                description: "Faturas iniciais geradas e contrato ativo."
-            });
             queryClient.invalidateQueries({ queryKey: ["rental-contracts"] });
             queryClient.invalidateQueries({ queryKey: ["rental-bills"] });
             onOpenChange(false);
 
             // Reset
-            setRentValue("");
-            setClientId("");
-            setPropertyId("");
-            setContractFile(null);
-            setStartDate("");
+            if (!isEditing) {
+                setRentValue("");
+                setClientId("");
+                setPropertyId("");
+                setContractFile(null);
+                setStartDate("");
+            }
         },
         onError: (err) => {
-            toast.error("Erro ao criar contrato: " + err.message);
+            toast.error(`Erro ao ${isEditing ? 'atualizar' : 'criar'} contrato: ` + err.message);
         }
     });
 
@@ -144,9 +196,9 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0 overflow-hidden">
                 <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
-                    <DialogTitle className="text-xl">Novo Contrato de Aluguel</DialogTitle>
+                    <DialogTitle className="text-xl">{isEditing ? "Editar Contrato" : "Novo Contrato de Aluguel"}</DialogTitle>
                     <DialogDescription>
-                        Preencha os dados do contrato. O sistema calculará automaticamente os repasses.
+                        {isEditing ? "Atualize os dados do contrato." : "Preencha os dados do contrato. O sistema calculará automaticamente os repasses."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -161,7 +213,7 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
                             <div className="space-y-3">
                                 <div className="space-y-1.5">
                                     <Label>Imóvel</Label>
-                                    <Select value={propertyId} onValueChange={setPropertyId}>
+                                    <Select value={propertyId} onValueChange={setPropertyId} disabled={isEditing}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecione o imóvel" />
                                         </SelectTrigger>
@@ -185,7 +237,7 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
 
                                 <div className="space-y-1.5">
                                     <Label>Inquilino</Label>
-                                    <Select value={clientId} onValueChange={setClientId}>
+                                    <Select value={clientId} onValueChange={setClientId} disabled={isEditing}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecione o cliente" />
                                         </SelectTrigger>
@@ -208,6 +260,9 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
                             <div className="space-y-2">
                                 <Label>Contrato Assinado (PDF)</Label>
                                 <ContractUpload onFileSelect={setContractFile} />
+                                {isEditing && contractToEdit?.arquivo_url && !contractFile && (
+                                    <p className="text-xs text-blue-600">Arquivo atual mantido.</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -348,20 +403,20 @@ export function NewContractDialog({ open, onOpenChange }: NewContractDialogProps
                                 <ul className="list-disc pl-4 space-y-1 opacity-90">
                                     <li>Inquilino paga dia <strong>{dueDay}</strong>.</li>
                                     <li>Repasse ao proprietário dia <strong>{payoutDay}</strong>.</li>
-                                    <li>Primeira fatura será gerada para <strong>{startDate ? new Date(startDate).toLocaleDateString() : "..."}</strong>.</li>
+                                    <li>{isEditing ? 'Atualização de contrato existente.' : `Primeira fatura será gerada para ${startDate ? new Date(startDate).toLocaleDateString() : "..."}.`}</li>
                                 </ul>
                             </div>
                         </div>
 
                         <div className="pt-6 mt-auto">
                             <Button
-                                onClick={() => createContractMutation.mutate()}
-                                disabled={!isValid || createContractMutation.isPending}
+                                onClick={() => upsertContractMutation.mutate()}
+                                disabled={!isValid || upsertContractMutation.isPending}
                                 className="w-full h-12 text-base shadow-lg"
                                 size="lg"
                             >
-                                {createContractMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                Criar Contrato Agora
+                                {upsertContractMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                {isEditing ? "Salvar Alterações" : "Criar Contrato Agora"}
                             </Button>
                             <Button
                                 variant="ghost"

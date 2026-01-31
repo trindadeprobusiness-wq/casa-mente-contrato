@@ -231,6 +231,12 @@ export function ContractsList() {
                                                             <DropdownMenuItem onClick={() => handleOpenCalculator(contract)}>
                                                                 <Calculator className="mr-2 h-4 w-4" /> Simular Repasse
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => {
+                                                                setSelectedContract(contract);
+                                                                setIsNewContractOpen(true);
+                                                            }}>
+                                                                <MoreHorizontal className="mr-2 h-4 w-4" /> Editar Contrato
+                                                            </DropdownMenuItem>
                                                             {contract.arquivo_url && (
                                                                 <DropdownMenuItem onClick={() => handleViewContract(contract.arquivo_url)}>
                                                                     <FileText className="mr-2 h-4 w-4" /> Ver Contrato
@@ -311,7 +317,14 @@ export function ContractsList() {
                     </DialogContent>
                 </Dialog>
             </Card>
-            <NewContractDialog open={isNewContractOpen} onOpenChange={setIsNewContractOpen} />
+            <NewContractDialog
+                open={isNewContractOpen}
+                onOpenChange={(open) => {
+                    setIsNewContractOpen(open);
+                    if (!open) setSelectedContract(null);
+                }}
+                contractToEdit={selectedContract}
+            />
         </>
     );
 }
