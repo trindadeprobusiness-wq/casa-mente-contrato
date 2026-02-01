@@ -1,1 +1,10 @@
 project_id = "kvvldgrnljnhjbrltphj"
+
+[functions.generate-whatsapp-message]
+verify_jwt = false
+
+[functions.gerar-contrato]
+verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
