@@ -10,14 +10,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Calculator, CalendarDays, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
-
 import { ContractUpload } from "./ContractUpload";
 import { parseContratoContent } from "@/types/rental";
+import { Database } from "@/integrations/supabase/types";
+
+type TipoContrato = Database["public"]["Enums"]["tipo_contrato"];
 
 interface NewContractDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    contractToEdit?: any; // Added prop for editing
+    contractToEdit?: any;
 }
 
 export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewContractDialogProps) {
@@ -32,7 +34,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
     const [startDate, setStartDate] = useState("");
     const [dueDay, setDueDay] = useState("10");
     const [payoutDay, setPayoutDay] = useState("15");
-    const [duration, setDuration] = useState("30"); // Months
+    const [duration, setDuration] = useState("30");
     const [contractFile, setContractFile] = useState<File | null>(null);
 
     // Populate form when editing
@@ -45,11 +47,10 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
             setDueDay(contractToEdit.dia_vencimento?.toString() || "10");
 
             const content = parseContratoContent(contractToEdit.conteudo);
-            setAdminFee(content.taxa_administracao?.toString() || contractToEdit.taxa_administracao_percentual?.toString() || "10");
+            setAdminFee(content.taxa_administracao?.toString() || "10");
             setPayoutDay(content.dia_repasse?.toString() || "15");
             setDuration(content.meses_duracao?.toString() || "30");
         } else if (!open && !contractToEdit) {
-            // Reset if closing and not editing (keep reset logic simple)
             setRentValue("");
             setClientId("");
             setPropertyId("");
@@ -72,9 +73,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
         queryKey: ["properties-select"],
         queryFn: async () => {
             const { data } = await supabase.from("imoveis").select("id, titulo, proprietario_nome, endereco").eq("ativo", true).order("titulo");
-
-            // If editing, we might need to include the current property even if it's inactive (though here we just list active ones)
-            // For now assuming the property attached to the contract is still fetchable or present in this list if active.
             return data || [];
         }
     });
@@ -96,7 +94,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
             const { data: corretor } = await supabase.from("corretores").select("id").eq("user_id", user.id).single();
             if (!corretor) throw new Error("Perfil de corretor não encontrado");
 
-            let arquivoPath = contractToEdit?.arquivo_url; // Default to existing path if editing
+            let arquivoPath = contractToEdit?.arquivo_url;
 
             if (contractFile) {
                 const fileExt = contractFile.name.split('.').pop();
@@ -117,11 +115,13 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
             const end = new Date(start);
             end.setMonth(end.getMonth() + parseInt(duration));
 
+            const tipo: TipoContrato = 'LOCACAO_RESIDENCIAL';
+
             const contractData = {
                 corretor_id: corretor.id,
                 cliente_id: clientId,
                 imovel_id: propertyId,
-                tipo: 'LOCACAO_RESIDENCIAL',
+                tipo,
                 valor: rent,
                 data_inicio: startDate || new Date().toISOString(),
                 dia_vencimento: parseInt(dueDay),
@@ -139,7 +139,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
             let result;
 
             if (isEditing && contractToEdit) {
-                // Update
                 const { data, error } = await supabase
                     .from("contratos")
                     .update(contractData)
@@ -151,7 +150,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                 result = data;
                 toast.success("Contrato atualizado com sucesso!");
             } else {
-                // Insert
                 const { data, error } = await supabase
                     .from("contratos")
                     .insert(contractData)
@@ -161,12 +159,8 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                 if (error) throw error;
                 result = data;
                 toast.success("Contrato criado com sucesso!", {
-                    description: "Faturas iniciais geradas e contrato ativo."
+                    description: "Contrato ativo e pronto para gerenciamento."
                 });
-
-                // Generate first bill ONLY for new contracts to avoid dupes/confusion on edit
-                // @ts-ignore
-                await supabase.rpc('generate_monthly_rent_bills', { reference_date: new Date().toISOString() });
             }
 
             return result;
@@ -176,7 +170,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
             queryClient.invalidateQueries({ queryKey: ["rental-bills"] });
             onOpenChange(false);
 
-            // Reset
             if (!isEditing) {
                 setRentValue("");
                 setClientId("");
@@ -202,8 +195,8 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 h-[600px] md:h-auto">
-                    {/* Left Column: Entities & Structure */}
+                <div className="grid grid-cols-1 md:grid-cols-12 max-h-[70vh] overflow-y-auto">
+                    {/* Left Column: Entities & Documentation */}
                     <div className="md:col-span-4 p-6 border-r space-y-6 bg-background">
                         <div className="space-y-4">
                             <h3 className="font-semibold flex items-center gap-2 text-sm text-muted-foreground uppercase tracking-wider">
@@ -337,7 +330,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                         <Label>Dia Vencimento</Label>
                                         <Select value={dueDay} onValueChange={(val) => {
                                             setDueDay(val);
-                                            // Auto-adjust payout day
                                             const next = parseInt(val) + 5;
                                             setPayoutDay(next <= 30 ? next.toString() : "1");
                                         }}>
@@ -354,7 +346,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                         <Select value={payoutDay} onValueChange={setPayoutDay}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                                {[1, 5, 10, 15, 20, 25, 28].map(d => (
                                                     <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -365,69 +357,49 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                         </div>
                     </div>
 
-                    {/* Right Column: Preview */}
-                    <div className="md:col-span-4 p-6 bg-muted/10 flex flex-col justify-between">
-                        <div className="space-y-6">
-                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
-                                Resumo Financeiro
-                            </h3>
+                    {/* Right Column: Summary */}
+                    <div className="md:col-span-4 p-6 space-y-4 bg-muted/20">
+                        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                            Resumo Financeiro
+                        </h3>
 
-                            <Card className="border-none shadow-md bg-white dark:bg-card">
-                                <CardContent className="p-6 space-y-6">
-                                    <div className="space-y-1 text-center">
-                                        <span className="text-xs text-muted-foreground uppercase font-semibold">Valor Bruto</span>
-                                        <div className="text-3xl font-bold text-foreground">
-                                            R$ {rent.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                        </div>
-                                    </div>
+                        <Card className="shadow-sm">
+                            <CardContent className="p-4 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Aluguel Bruto:</span>
+                                    <span className="font-semibold">R$ {rent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between items-center text-blue-600">
+                                    <span>Taxa Administrativa ({feePct}%):</span>
+                                    <span className="font-semibold">- R$ {feeVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between items-center text-green-600">
+                                    <span>Repasse ao Proprietário:</span>
+                                    <span className="font-bold text-lg">R$ {netVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                                    <div className="space-y-3 pt-4 border-t">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">Comissão ({feePct}%)</span>
-                                            <span className="font-medium text-red-500">
-                                                - R$ {feeVal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center pt-2">
-                                            <span className="font-semibold text-sm">Repasse Líquido</span>
-                                            <span className="text-xl font-bold text-green-600">
-                                                R$ {netVal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 text-xs text-blue-700 dark:text-blue-300 space-y-2">
-                                <p className="font-medium">Detalhes do Fluxo:</p>
-                                <ul className="list-disc pl-4 space-y-1 opacity-90">
-                                    <li>Inquilino paga dia <strong>{dueDay}</strong>.</li>
-                                    <li>Repasse ao proprietário dia <strong>{payoutDay}</strong>.</li>
-                                    <li>{isEditing ? 'Atualização de contrato existente.' : `Primeira fatura será gerada para ${startDate ? new Date(startDate).toLocaleDateString() : "..."}.`}</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div className="pt-6 mt-auto">
-                            <Button
-                                onClick={() => upsertContractMutation.mutate()}
-                                disabled={!isValid || upsertContractMutation.isPending}
-                                className="w-full h-12 text-base shadow-lg"
-                                size="lg"
-                            >
-                                {upsertContractMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                {isEditing ? "Salvar Alterações" : "Criar Contrato Agora"}
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => onOpenChange(false)}
-                                className="w-full mt-2"
-                            >
-                                Cancelar
-                            </Button>
+                        <div className="text-xs text-muted-foreground space-y-1 p-3 bg-background rounded-lg border">
+                            <p>• A fatura será gerada mensalmente no dia <strong>{dueDay}</strong>.</p>
+                            <p>• O repasse ao proprietário será agendado para o dia <strong>{payoutDay}</strong>.</p>
+                            <p>• O contrato terá duração de <strong>{duration} meses</strong>.</p>
                         </div>
                     </div>
                 </div>
+
+                <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                    <Button
+                        onClick={() => upsertContractMutation.mutate()}
+                        disabled={!isValid || upsertContractMutation.isPending}
+                    >
+                        {upsertContractMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isEditing ? "Salvar Alterações" : "Criar Contrato"}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

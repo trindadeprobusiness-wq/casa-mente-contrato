@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 serve(async (req) => {
@@ -13,41 +12,73 @@ serve(async (req) => {
 
     try {
         const { clientName, messageType, details, tone } = await req.json()
-        const apiKey = Deno.env.get('GEMINI_API_KEY')
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 
-        if (!apiKey) {
-            throw new Error('GEMINI_API_KEY not found in environment variables')
+        if (!LOVABLE_API_KEY) {
+            throw new Error('LOVABLE_API_KEY not configured')
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const systemPrompt = `Você é um assistente profissional de corretor de imóveis. Escreva mensagens curtas e claras para WhatsApp em português brasileiro.
 
-        let prompt = `Act as a professional real estate agent assistant. Write a short, clear WhatsApp message in Portuguese (Brazil) for a client named "${clientName}".
-    
-    Context:
-    - Message Type: ${messageType}
-    - Tone: ${tone || 'friendly'}
-    - Details: ${JSON.stringify(details)}
-    
-    Guidelines:
-    - Use appropriate emojis but don't overdo it.
-    - Be concise and polite.
-    - Do not include subject lines or placeholders like [Name], use the provided name.
-    - If it's a payment reminder, mention the value and due date clearly.
-    - If it's a "thank you", confirm the payment receipt.
-    `
+Diretrizes:
+- Use emojis apropriados, mas com moderação
+- Seja conciso e educado
+- Não use linhas de assunto ou placeholders como [Nome]
+- Se for lembrete de pagamento, mencione o valor e data de vencimento claramente
+- Se for agradecimento, confirme o recebimento do pagamento`
 
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
+        const userPrompt = `Escreva uma mensagem de WhatsApp para o cliente "${clientName}".
+
+Contexto:
+- Tipo de Mensagem: ${messageType === 'reminder' ? 'Lembrete de Vencimento' : messageType === 'late' ? 'Cobrança de Atraso' : messageType === 'thank_you' ? 'Agradecimento de Pagamento' : 'Outro'}
+- Tom: ${tone === 'friendly' ? 'Amigável' : tone === 'formal' ? 'Profissional' : 'Incisivo'}
+- Detalhes: ${JSON.stringify(details)}`
+
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "google/gemini-3-flash-preview",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+            }),
+        })
+
+        if (!response.ok) {
+            if (response.status === 429) {
+                return new Response(
+                    JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }),
+                    { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+            if (response.status === 402) {
+                return new Response(
+                    JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos ao workspace." }),
+                    { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+            const errorText = await response.text()
+            console.error("AI Gateway error:", response.status, errorText)
+            throw new Error("Erro ao gerar mensagem com IA")
+        }
+
+        const data = await response.json()
+        const message = data.choices?.[0]?.message?.content || ""
 
         return new Response(
-            JSON.stringify({ message: text }),
+            JSON.stringify({ message }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
+        console.error("generate-whatsapp-message error:", errorMessage)
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: errorMessage }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }

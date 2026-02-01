@@ -7,10 +7,10 @@ export function DashboardCharts() {
     const { data: chartData, isLoading } = useQuery({
         queryKey: ["rental-charts"],
         queryFn: async () => {
-            // Fetch all active contracts to estimate split
+            // Fetch all active contracts - using only existing columns
             const { data: contracts } = await supabase
                 .from("contratos")
-                .select("valor, taxa_administracao_percentual")
+                .select("valor")
                 .eq("status", "ATIVO");
 
             let totalRent = 0;
@@ -19,7 +19,7 @@ export function DashboardCharts() {
 
             contracts?.forEach(c => {
                 const rent = c.valor || 0;
-                const feePct = c.taxa_administracao_percentual || 10;
+                const feePct = 10; // Default 10% admin fee
                 const fee = rent * (feePct / 100);
 
                 totalRent += rent;
@@ -28,8 +28,8 @@ export function DashboardCharts() {
             });
 
             const pieData = [
-                { name: 'Repasse Proprietários', value: totalOwner, color: '#22c55e' }, // Green
-                { name: 'Comissão Adm.', value: totalCommission, color: '#3b82f6' }, // Blue
+                { name: 'Repasse Proprietários', value: totalOwner, color: '#22c55e' },
+                { name: 'Comissão Adm.', value: totalCommission, color: '#3b82f6' },
             ];
 
             const barData = [

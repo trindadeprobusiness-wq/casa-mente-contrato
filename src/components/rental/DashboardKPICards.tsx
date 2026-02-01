@@ -1,41 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Users, Building, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Users, Wallet } from "lucide-react";
 
 export function DashboardKPICards() {
     const { data: stats, isLoading } = useQuery({
         queryKey: ["rental-kpis"],
         queryFn: async () => {
-            // 1. Total a Receber (Faturas PENDENTE do mês atual/futuro)
-            const { data: bills } = await supabase
-                .from("faturas_aluguel")
-                .select("valor_total")
-                .eq("status", "PENDENTE");
-
-            const totalReceivable = bills?.reduce((acc, curr) => acc + curr.valor_total, 0) || 0;
-
-            // 2. Total Repassado (Repasses CONFIRMADO)
-            const { data: transfers } = await supabase
-                .from("repasses_proprietario")
-                .select("valor_liquido_repasse")
-                .eq("status", "CONFIRMADO");
-
-            const totalTransferred = transfers?.reduce((acc, curr) => acc + curr.valor_liquido_repasse, 0) || 0;
-
-            // 3. Contratos Ativos
-            const { count: activeContracts } = await supabase
+            // Get active contracts and calculate estimates
+            const { data: contracts, count: activeContracts } = await supabase
                 .from("contratos")
-                .select("*", { count: 'exact', head: true })
+                .select("valor", { count: 'exact' })
                 .eq("status", "ATIVO");
 
-            // 4. Receita Estimada (Comissões PENDENTES + PAGAS esse mês) - Simplificado
-            // Vamos pegar 10% do Receivable como estimativa rápida se não tivermos histórico
-            const estimatedCommission = totalReceivable * 0.10;
+            // Calculate estimates based on active contracts
+            const totalReceivable = contracts?.reduce((acc, curr) => acc + (curr.valor || 0), 0) || 0;
+            const estimatedCommission = totalReceivable * 0.10; // Default 10%
+            const estimatedTransfer = totalReceivable * 0.90;
 
             return {
                 totalReceivable,
-                totalTransferred,
+                totalTransferred: estimatedTransfer,
                 activeContracts: activeContracts || 0,
                 estimatedCommission
             };
@@ -57,20 +42,20 @@ export function DashboardKPICards() {
                     <div className="text-2xl font-bold">
                         R$ {stats?.totalReceivable.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </div>
-                    <p className="text-xs text-muted-foreground">Faturas pendentes</p>
+                    <p className="text-xs text-muted-foreground">Estimado (contratos ativos)</p>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Repasses Realizados</CardTitle>
+                    <CardTitle className="text-sm font-medium">Repasses Estimados</CardTitle>
                     <ArrowDownRight className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
                         R$ {stats?.totalTransferred.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </div>
-                    <p className="text-xs text-muted-foreground">Valor já pago aos donos</p>
+                    <p className="text-xs text-muted-foreground">Valor líquido aos proprietários</p>
                 </CardContent>
             </Card>
 

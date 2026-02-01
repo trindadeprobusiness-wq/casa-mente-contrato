@@ -727,175 +727,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      },
-      faturas_aluguel: {
-        Row: {
-          boleto_url: string | null
-          cliente_id: string
-          comprovante_url: string | null
-          contrato_id: string
-          corretor_id: string
-          created_at: string | null
-          data_pagamento: string | null
-          data_vencimento: string
-          id: string
-          imovel_id: string
-          mes_referencia: string
-          status: string
-          updated_at: string | null
-          valor_aluguel: number
-          valor_condominio: number | null
-          valor_desconto: number | null
-          valor_extras: number | null
-          valor_iptu: number | null
-          valor_pago: number | null
-          valor_total: number | null
-        }
-        Insert: {
-          boleto_url?: string | null
-          cliente_id: string
-          comprovante_url?: string | null
-          contrato_id: string
-          corretor_id: string
-          created_at?: string | null
-          data_pagamento?: string | null
-          data_vencimento: string
-          id?: string
-          imovel_id: string
-          mes_referencia: string
-          status?: string
-          updated_at?: string | null
-          valor_aluguel: number
-          valor_condominio?: number | null
-          valor_desconto?: number | null
-          valor_extras?: number | null
-          valor_iptu?: number | null
-          valor_pago?: number | null
-        }
-        Update: {
-          boleto_url?: string | null
-          cliente_id?: string
-          comprovante_url?: string | null
-          contrato_id?: string
-          corretor_id?: string
-          created_at?: string | null
-          data_pagamento?: string | null
-          data_vencimento?: string
-          id?: string
-          imovel_id?: string
-          mes_referencia?: string
-          status?: string
-          updated_at?: string | null
-          valor_aluguel?: number
-          valor_condominio?: number | null
-          valor_desconto?: number | null
-          valor_extras?: number | null
-          valor_iptu?: number | null
-          valor_pago?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "faturas_aluguel_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "faturas_aluguel_contrato_id_fkey"
-            columns: ["contrato_id"]
-            isOneToOne: false
-            referencedRelation: "contratos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "faturas_aluguel_corretor_id_fkey"
-            columns: ["corretor_id"]
-            isOneToOne: false
-            referencedRelation: "corretores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "faturas_aluguel_imovel_id_fkey"
-            columns: ["imovel_id"]
-            isOneToOne: false
-            referencedRelation: "imoveis"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
-      repasses_proprietario: {
-        Row: {
-          comprovante_transferencia_url: string | null
-          contrato_id: string
-          corretor_id: string
-          created_at: string | null
-          data_prevista: string
-          data_transferencia: string | null
-          fatura_origem_id: string | null
-          id: string
-          proprietario_nome: string
-          status: string
-          updated_at: string | null
-          valor_bruto_recebido: number
-          valor_liquido_repasse: number
-          valor_taxa_adm: number
-        }
-        Insert: {
-          comprovante_transferencia_url?: string | null
-          contrato_id: string
-          corretor_id: string
-          created_at?: string | null
-          data_prevista: string
-          data_transferencia?: string | null
-          fatura_origem_id?: string | null
-          id?: string
-          proprietario_nome: string
-          status?: string
-          updated_at?: string | null
-          valor_bruto_recebido: number
-          valor_liquido_repasse: number
-          valor_taxa_adm: number
-        }
-        Update: {
-          comprovante_transferencia_url?: string | null
-          contrato_id?: string
-          corretor_id?: string
-          created_at?: string | null
-          data_prevista?: string
-          data_transferencia?: string | null
-          fatura_origem_id?: string | null
-          id?: string
-          proprietario_nome?: string
-          status?: string
-          updated_at?: string | null
-          valor_bruto_recebido?: number
-          valor_liquido_repasse?: number
-          valor_taxa_adm?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "repasses_proprietario_contrato_id_fkey"
-            columns: ["contrato_id"]
-            isOneToOne: false
-            referencedRelation: "contratos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "repasses_proprietario_corretor_id_fkey"
-            columns: ["corretor_id"]
-            isOneToOne: false
-            referencedRelation: "corretores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "repasses_proprietario_fatura_origem_id_fkey"
-            columns: ["fatura_origem_id"]
-            isOneToOne: false
-            referencedRelation: "faturas_aluguel"
-            referencedColumns: ["id"]
-          }
-        ]
       }
     }
     Views: {
@@ -906,56 +737,56 @@ export type Database = {
     }
     Enums: {
       categoria_financeira:
-      | "ANUNCIO_PORTAL"
-      | "ANUNCIO_SOCIAL"
-      | "ANUNCIO_TRADICIONAL"
-      | "OPERACIONAL_ESCRITORIO"
-      | "OPERACIONAL_TRANSPORTE"
-      | "OPERACIONAL_SISTEMA"
-      | "IMPOSTO_ISS"
-      | "IMPOSTO_IR"
-      | "TAXA_BANCARIA"
-      | "COMISSAO_PARCEIRO"
-      | "COMISSAO_VENDA"
-      | "COMISSAO_LOCACAO"
-      | "TAXA_INTERMEDIACAO"
-      | "HONORARIO_AVALIACAO"
-      | "CONSULTORIA"
-      | "OUTROS"
+        | "ANUNCIO_PORTAL"
+        | "ANUNCIO_SOCIAL"
+        | "ANUNCIO_TRADICIONAL"
+        | "OPERACIONAL_ESCRITORIO"
+        | "OPERACIONAL_TRANSPORTE"
+        | "OPERACIONAL_SISTEMA"
+        | "IMPOSTO_ISS"
+        | "IMPOSTO_IR"
+        | "TAXA_BANCARIA"
+        | "COMISSAO_PARCEIRO"
+        | "COMISSAO_VENDA"
+        | "COMISSAO_LOCACAO"
+        | "TAXA_INTERMEDIACAO"
+        | "HONORARIO_AVALIACAO"
+        | "CONSULTORIA"
+        | "OUTROS"
       prioridade_alerta: "ALTA" | "MEDIA" | "BAIXA"
       status_funil:
-      | "QUALIFICACAO"
-      | "VISITA_PROPOSTA"
-      | "DOCUMENTACAO"
-      | "FECHADO_GANHO"
-      | "FECHADO_PERDIDO"
+        | "QUALIFICACAO"
+        | "VISITA_PROPOSTA"
+        | "DOCUMENTACAO"
+        | "FECHADO_GANHO"
+        | "FECHADO_PERDIDO"
       tipo_alerta: "FOLLOWUP" | "DOCUMENTO" | "EXCLUSIVIDADE" | "GERAL"
       tipo_contato:
-      | "LIGACAO"
-      | "EMAIL"
-      | "WHATSAPP"
-      | "VISITA"
-      | "PROPOSTA"
-      | "NOTA"
+        | "LIGACAO"
+        | "EMAIL"
+        | "WHATSAPP"
+        | "VISITA"
+        | "PROPOSTA"
+        | "NOTA"
       tipo_contrato:
-      | "COMPRA_VENDA"
-      | "LOCACAO_RESIDENCIAL"
-      | "LOCACAO_COMERCIAL"
-      | "EXCLUSIVIDADE_VENDA"
-      | "EXCLUSIVIDADE_LOCACAO"
-      | "DISTRATO"
-      | "PROCURACAO"
-      | "OUTRO"
+        | "COMPRA_VENDA"
+        | "LOCACAO_RESIDENCIAL"
+        | "LOCACAO_COMERCIAL"
+        | "EXCLUSIVIDADE_VENDA"
+        | "EXCLUSIVIDADE_LOCACAO"
+        | "DISTRATO"
+        | "PROCURACAO"
+        | "OUTRO"
       tipo_imovel: "APARTAMENTO" | "CASA" | "COMERCIAL" | "TERRENO"
       tipo_interesse: "COMPRA" | "LOCACAO" | "AMBOS"
       tipo_lancamento: "RECEITA" | "DESPESA"
       tipo_video:
-      | "TOUR_VIRTUAL"
-      | "APRESENTACAO"
-      | "DEPOIMENTO"
-      | "DRONE"
-      | "INSTITUCIONAL"
-      | "OUTRO"
+        | "TOUR_VIRTUAL"
+        | "APRESENTACAO"
+        | "DEPOIMENTO"
+        | "DRONE"
+        | "INSTITUCIONAL"
+        | "OUTRO"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -969,116 +800,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
