@@ -208,16 +208,24 @@ export function ContractsList() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`
-                                                            ${contract.status === 'ATIVO' ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20' : ''}
-                                                            ${contract.status === 'PENDENTE' ? 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : ''}
-                                                            ${contract.status === 'CANCELADO' ? 'border-red-500 text-red-600 bg-red-50 dark:bg-red-900/20' : ''}
-                                                        `}
-                                                    >
-                                                        {contract.status}
-                                                    </Badge>
+                                                    <div className="flex flex-col gap-1 items-center">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`
+                                                                ${contract.status === 'ATIVO' ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20' : ''}
+                                                                ${contract.status === 'PENDENTE' ? 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : ''}
+                                                                ${contract.status === 'CANCELADO' ? 'border-red-500 text-red-600 bg-red-50 dark:bg-red-900/20' : ''}
+                                                            `}
+                                                        >
+                                                            {contract.status}
+                                                        </Badge>
+                                                        {/* Asaas Badge - Checks if content has Asaas metadata or simply mocks it if user tagged it */}
+                                                        {(content.obs?.toLowerCase().includes('asaas') || contract.dados_bancarios_repasse) && (
+                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] h-5">
+                                                                Asaas
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <DropdownMenu>

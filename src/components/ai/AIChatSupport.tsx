@@ -68,6 +68,10 @@ export function AIChatSupport() {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    // Initialize Gemini Client
+    // Note: In a production app, use a backend proxy. For this local demo, direct call is fine.
+    const apiKey = 'AIzaSyC_bk4eWjrwb2YtKa7hW_QuxRmHRPeU1kw';
+
     const handleSendMessage = async () => {
         if (!inputText.trim() && !selectedFile) return;
 
@@ -91,38 +95,45 @@ export function AIChatSupport() {
         setIsTyping(true);
 
         try {
-            let attachmentUrl = null;
-
+            // 1. Upload to Supabase (Optional - just for history/records)
             if (fileToUpload) {
                 const fileExt = fileToUpload.name.split('.').pop();
                 const fileName = `${Date.now()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('chat-attachments')
-                    .upload(fileName, fileToUpload);
-
-                if (uploadError) throw uploadError;
-
-                const { data } = supabase.storage
-                    .from('chat-attachments')
-                    .getPublicUrl(fileName);
-
-                attachmentUrl = data.publicUrl;
+                await supabase.storage.from('chat-attachments').upload(fileName, fileToUpload);
             }
 
-            const { data, error } = await supabase.functions.invoke('ai-chat', {
-                body: {
-                    message: userMessage.content,
-                    attachmentUrl: attachmentUrl,
-                    attachmentType: isImage ? 'image' : 'file'
-                }
-            });
+            // 2. Call Gemini API Directly
+            const { GoogleGenerativeAI } = await import("@google/generative-ai");
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            if (error) throw error;
+            let result;
+
+            if (isImage && fileToUpload && filePreview) {
+                // Prepare image for Gemini
+                // Extract base64 (remove data:image/xxx;base64, prefix)
+                const base64Data = filePreview.split(',')[1];
+
+                const imagePart = {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: fileToUpload.type,
+                    },
+                };
+
+                const prompt = userMessage.content || "O que tem nesta imagem?";
+                result = await model.generateContent([prompt, imagePart]);
+            } else {
+                // Text only
+                result = await model.generateContent(userMessage.content);
+            }
+
+            const responseText = result.response.text();
 
             const response: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: data.reply || "Não consegui gerar uma resposta.",
+                content: responseText,
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, response]);
@@ -133,7 +144,7 @@ export function AIChatSupport() {
             const errorResponse: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.",
+                content: "Desculpe, ocorreu um erro ao se comunicar com o Gemini. Verifique se a chave API está válida.",
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, errorResponse]);
