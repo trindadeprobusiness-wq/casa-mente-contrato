@@ -322,32 +322,64 @@ export function ContractsList() {
                         </div>
                     </Tabs>
                 </CardContent>
-                <div className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">Taxa ({feePct}%)</div>
-                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        R$ {fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </div>
-                </div>
-                <div className="p-4 rounded-lg border bg-green-50/50 dark:bg-green-900/10 space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">Líquido Prophetário</div>
-                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                        R$ {net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </div>
-                </div>
+            </Card>
+
+            {/* Calculator Dialog */}
+            <Dialog open={isCalcOpen} onOpenChange={setIsCalcOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Calculator className="h-5 w-5 text-primary" />
+                            Simulador de Repasse
+                        </DialogTitle>
+                    </DialogHeader>
+                    {selectedContract && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Valor do Aluguel (R$)</Label>
+                                <Input
+                                    type="number"
+                                    value={simulatedRent}
+                                    onChange={(e) => setSimulatedRent(Number(e.target.value))}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                {(() => {
+                                    const content = parseContratoContent(selectedContract.conteudo);
+                                    const feePct = content.taxa_administracao || selectedContract.taxa_administracao_percentual || 10;
+                                    const fee = simulatedRent * (feePct / 100);
+                                    const net = simulatedRent - fee;
+                                    return (
+                                        <>
+                                            <div className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 space-y-1">
+                                                <div className="text-xs text-muted-foreground font-medium">Taxa ({feePct}%)</div>
+                                                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                                    R$ {fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+                                            <div className="p-4 rounded-lg border bg-green-50/50 dark:bg-green-900/10 space-y-1">
+                                                <div className="text-xs text-muted-foreground font-medium">Líquido Proprietário</div>
+                                                <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                                                    R$ {net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <NewContractDialog
+                open={isNewContractOpen}
+                onOpenChange={(open) => {
+                    setIsNewContractOpen(open);
+                    if (!open) setSelectedContract(null);
+                }}
+                contractToEdit={selectedContract}
+            />
         </div>
-                            </div >
-                        </div >
-                    </DialogContent >
-                </Dialog >
-            </Card >
-        <NewContractDialog
-            open={isNewContractOpen}
-            onOpenChange={(open) => {
-                setIsNewContractOpen(open);
-                if (!open) setSelectedContract(null);
-            }}
-            contractToEdit={selectedContract}
-        />
-        </>
     );
 }
