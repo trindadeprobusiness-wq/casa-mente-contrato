@@ -245,6 +245,40 @@ export function ContractsList() {
                                                             }}>
                                                                 <MoreHorizontal className="mr-2 h-4 w-4" /> Editar Contrato
                                                             </DropdownMenuItem>
+
+                                                            <DropdownMenuItem onClick={async () => {
+                                                                try {
+                                                                    const currentObs = content.obs || '';
+                                                                    const hasAsaas = currentObs.toLowerCase().includes('asaas');
+                                                                    const newObs = hasAsaas
+                                                                        ? currentObs.replace(/asaas/gi, '').trim()
+                                                                        : `${currentObs} [Asaas]`.trim();
+
+                                                                    const newContent = {
+                                                                        ...content,
+                                                                        obs: newObs
+                                                                    };
+
+                                                                    const { error } = await supabase
+                                                                        .from('contratos')
+                                                                        .update({ conteudo: JSON.stringify(newContent) })
+                                                                        .eq('id', contract.id);
+
+                                                                    if (error) throw error;
+
+                                                                    // Optimistic update or refetch would be better, but for now relying on query invalidation if setup
+                                                                    window.location.reload(); // Quick refresh to show change
+                                                                } catch (err) {
+                                                                    console.error('Erro ao alternar Asaas:', err);
+                                                                    alert('Erro ao atualizar status Asaas');
+                                                                }
+                                                            }}>
+                                                                <div className="flex items-center w-full">
+                                                                    <DollarSign className="mr-2 h-4 w-4 text-secondary-foreground" />
+                                                                    {content.obs?.toLowerCase().includes('asaas') ? 'Remover Asaas' : 'Integrar Asaas'}
+                                                                </div>
+                                                            </DropdownMenuItem>
+
                                                             {contract.arquivo_url && (
                                                                 <DropdownMenuItem onClick={() => handleViewContract(contract.arquivo_url)}>
                                                                     <FileText className="mr-2 h-4 w-4" /> Ver Contrato
