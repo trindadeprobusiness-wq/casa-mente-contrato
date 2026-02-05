@@ -93,10 +93,25 @@ export function NovoLancamentoDialog({
       setValue('categoria', lancamentoToEdit.categoria);
       setValue('descricao', lancamentoToEdit.descricao);
       setValue('valor', Number(lancamentoToEdit.valor));
-      // Add timezone offset safety or just parseISO which handles YYYY-MM-DD correctly as local midnight?
-      // Actually parseISO('2026-01-15') returns UTC midnight. 
-      // To ensure it stays as selected date, we append T12:00:00 to be safe in middle of day
-      const safeDate = new Date(lancamentoToEdit.data + 'T12:00:00');
+
+      let safeDate = new Date();
+      if (lancamentoToEdit.data) {
+        // Handle both YYYY-MM-DD and ISO formats
+        const dateStr = lancamentoToEdit.data;
+        if (dateStr.includes('T')) {
+          safeDate = new Date(dateStr);
+        } else {
+          // Append time to ensure local date matches
+          safeDate = new Date(dateStr + 'T12:00:00');
+        }
+      }
+
+      // Fallback if date is invalid
+      if (isNaN(safeDate.getTime())) {
+        console.error("Invalid date found in record:", lancamentoToEdit.data);
+        safeDate = new Date();
+      }
+
       setValue('data', safeDate);
       setValue('recorrente', lancamentoToEdit.recorrente ?? false);
     } else if (!lancamentoToEdit && open) {
