@@ -77,7 +77,7 @@ export function AIChatSupport() {
             content: inputText,
             attachment: selectedFile ? {
                 name: selectedFile.name,
-                url: filePreview || '', // In a real app, this would be the uploaded URL
+                url: filePreview || '',
                 type: selectedFile.type.startsWith('image/') ? 'image' : 'file'
             } : undefined,
             timestamp: new Date(),
@@ -85,40 +85,64 @@ export function AIChatSupport() {
 
         setMessages((prev) => [...prev, userMessage]);
         setInputText('');
+        const fileToUpload = selectedFile;
+        const isImage = selectedFile?.type.startsWith('image/');
         clearAttachment();
         setIsTyping(true);
 
-        // Mock AI Response Logic with Attachment Awareness
-        setTimeout(() => {
-            let responseText = generateMockResponse(userMessage.content);
-            if (userMessage.attachment) {
-                responseText = `Recebi seu arquivo "${userMessage.attachment.name}". Estou analisando... (Simulação: Análise concluída no próximo passo)`;
+        try {
+            let attachmentUrl = null;
+
+            if (fileToUpload) {
+                const fileExt = fileToUpload.name.split('.').pop();
+                const fileName = `${Date.now()}.${fileExt}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('chat-attachments')
+                    .upload(fileName, fileToUpload);
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage
+                    .from('chat-attachments')
+                    .getPublicUrl(fileName);
+
+                attachmentUrl = data.publicUrl;
             }
+
+            const { data, error } = await supabase.functions.invoke('ai-chat', {
+                body: {
+                    message: userMessage.content,
+                    attachmentUrl: attachmentUrl,
+                    attachmentType: isImage ? 'image' : 'file'
+                }
+            });
+
+            if (error) throw error;
 
             const response: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: responseText,
+                content: data.reply || "Não consegui gerar uma resposta.",
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, response]);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            toast.error('Erro ao conectar com a IA.');
+            const errorResponse: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.",
+                timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, errorResponse]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
 
-    const generateMockResponse = (input: string): string => {
-        const lowerInput = input.toLowerCase();
-        if (lowerInput.includes('faturamento') || lowerInput.includes('receita')) {
-            return 'Baseado nos dados do financeiro, sua receita este mês está positiva! Posso gerar um relatório detalhado se quiser.';
-        }
-        if (lowerInput.includes('contrato')) {
-            return 'Para criar um novo contrato, vá até a aba Jurídico ou use o botão rápido "Novo Contrato". Posso guiar você no processo.';
-        }
-        if (lowerInput.includes('lucro')) {
-            return 'O lucro líquido projetado para este ano mostra uma tendência de crescimento de 15%.';
-        }
-        return 'Entendi. Em breve estarei integrado ao Gemini para analisar seus textos e arquivos com inteligência avançada!';
-    };
+
 
     return (
         <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-4">
