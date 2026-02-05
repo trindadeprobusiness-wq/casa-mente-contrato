@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { DateRange } from "react-day-picker";
 import {
   DollarSign,
   TrendingDown,
@@ -29,12 +30,14 @@ import { GraficoReceitaDespesa } from '@/components/financeiro/GraficoReceitaDes
 import { GraficoProjecao } from '@/components/financeiro/GraficoProjecao';
 import { GraficoCategorias } from '@/components/financeiro/GraficoCategorias';
 import { LancamentoFinanceiro, ProjecaoMensal, TipoLancamento } from '@/types/financeiro';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { toast } from 'sonner';
 
-type Periodo = 'mes_atual' | 'trimestre' | 'ano' | 'todos';
+type Periodo = 'mes_atual' | 'trimestre' | 'ano' | 'todos' | 'personalizado';
 
 export default function Financeiro() {
   const [periodo, setPeriodo] = useState<Periodo>('mes_atual');
+  const [customDate, setCustomDate] = useState<DateRange | undefined>();
   const [projecao, setProjecao] = useState<ProjecaoMensal[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<TipoLancamento | 'todos'>('todos');
   const [lancamentoEmEdicao, setLancamentoEmEdicao] = useState<LancamentoFinanceiro | null>(null);
@@ -67,10 +70,19 @@ export default function Financeiro() {
         dataInicio = startOfYear(hoje);
         dataFim = endOfYear(hoje);
         break;
+      case 'personalizado':
+        if (customDate?.from) {
+          dataInicio = customDate.from;
+          dataFim = customDate.to || customDate.from;
+        }
+        break;
       default:
         dataInicio = undefined;
         dataFim = undefined;
     }
+
+    // Só busca se tiver datas definidas (ou for 'todos')
+    if (periodo === 'personalizado' && !dataInicio) return;
 
     await fetchLancamentos({ dataInicio, dataFim });
 
@@ -80,7 +92,7 @@ export default function Financeiro() {
 
   useEffect(() => {
     carregarDados();
-  }, [periodo]);
+  }, [periodo, customDate]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -109,6 +121,9 @@ export default function Financeiro() {
     trimestre: 'Últimos 3 meses',
     ano: `Ano de ${new Date().getFullYear()}`,
     todos: 'Todo o período',
+    personalizado: customDate?.from
+      ? `${format(customDate.from, "dd/MM/yyyy")} - ${customDate.to ? format(customDate.to, "dd/MM/yyyy") : '...'}`
+      : 'Período Personalizado',
   };
 
   if (loading && lancamentos.length === 0) {
@@ -139,6 +154,13 @@ export default function Financeiro() {
         </div>
 
         <div className="flex items-center gap-3">
+          {periodo === 'personalizado' && (
+            <DatePickerWithRange
+              date={customDate}
+              onDateChange={setCustomDate}
+            />
+          )}
+
           <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
             <SelectTrigger className="w-[180px]">
               <Calendar className="h-4 w-4 mr-2" />
@@ -149,6 +171,7 @@ export default function Financeiro() {
               <SelectItem value="trimestre">Trimestre</SelectItem>
               <SelectItem value="ano">Ano</SelectItem>
               <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="personalizado">Personalizado</SelectItem>
             </SelectContent>
           </Select>
 
