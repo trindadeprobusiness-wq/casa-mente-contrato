@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { Calendar as CalendarIcon, Plus, Edit2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,12 +28,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useFinanceiro } from '@/hooks/useFinanceiro';
-import { 
-  TipoLancamento, 
+import {
+  TipoLancamento,
   CategoriaFinanceira,
   CATEGORIA_LABELS,
   CATEGORIAS_DESPESA,
   CATEGORIAS_RECEITA,
+  LancamentoFinanceiro,
 } from '@/types/financeiro';
 import { toast } from 'sonner';
 
@@ -50,12 +51,23 @@ type FormData = z.infer<typeof schema>;
 
 interface NovoLancamentoDialogProps {
   onSuccess?: () => void;
+  lancamentoToEdit?: LancamentoFinanceiro | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
-  const [open, setOpen] = useState(false);
+export function NovoLancamentoDialog({
+  onSuccess,
+  lancamentoToEdit,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen
+}: NovoLancamentoDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [tipo, setTipo] = useState<TipoLancamento>('DESPESA');
-  const { addLancamento } = useFinanceiro();
+  const { addLancamento, updateLancamento } = useFinanceiro();
+
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = setControlledOpen ?? setInternalOpen;
 
   const {
     register,
@@ -73,6 +85,36 @@ export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
     },
   });
 
+  // Populate form for editing
+  useEffect(() => {
+    if (lancamentoToEdit && open) {
+      setTipo(lancamentoToEdit.tipo);
+      setValue('tipo', lancamentoToEdit.tipo);
+      setValue('categoria', lancamentoToEdit.categoria);
+      setValue('descricao', lancamentoToEdit.descricao);
+      setValue('valor', Number(lancamentoToEdit.valor));
+      // Add timezone offset safety or just parseISO which handles YYYY-MM-DD correctly as local midnight?
+      // Actually parseISO('2026-01-15') returns UTC midnight. 
+      // To ensure it stays as selected date, we append T12:00:00 to be safe in middle of day
+      const safeDate = new Date(lancamentoToEdit.data + 'T12:00:00');
+      setValue('data', safeDate);
+      setValue('recorrente', lancamentoToEdit.recorrente ?? false);
+    } else if (!lancamentoToEdit && open) {
+      // Reset logic for new entry
+      const now = new Date();
+      reset({
+        tipo: 'DESPESA',
+        // Ensure strictly 'today'
+        data: now,
+        recorrente: false,
+        categoria: '',
+        descricao: '',
+        valor: undefined,
+      });
+      setTipo('DESPESA');
+    }
+  }, [lancamentoToEdit, open, setValue, reset]);
+
   const selectedDate = watch('data');
   const isRecorrente = watch('recorrente');
 
@@ -80,21 +122,35 @@ export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await addLancamento({
-        tipo: data.tipo,
-        categoria: data.categoria as CategoriaFinanceira,
-        descricao: data.descricao,
-        valor: data.valor,
-        data: format(data.data, 'yyyy-MM-dd'),
-        recorrente: data.recorrente,
-      });
-      
-      toast.success(`${tipo === 'RECEITA' ? 'Receita' : 'Despesa'} registrada com sucesso!`);
+      const formattedDate = format(data.data, 'yyyy-MM-dd');
+
+      if (lancamentoToEdit) {
+        await updateLancamento(lancamentoToEdit.id, {
+          tipo: data.tipo,
+          categoria: data.categoria as CategoriaFinanceira,
+          descricao: data.descricao,
+          valor: data.valor,
+          data: formattedDate,
+          recorrente: data.recorrente,
+        });
+        toast.success('Lançamento atualizado com sucesso!');
+      } else {
+        await addLancamento({
+          tipo: data.tipo,
+          categoria: data.categoria as CategoriaFinanceira,
+          descricao: data.descricao,
+          valor: data.valor,
+          data: formattedDate,
+          recorrente: data.recorrente,
+        });
+        toast.success(`${tipo === 'RECEITA' ? 'Receita' : 'Despesa'} registrada com sucesso!`);
+      }
+
       reset();
       setOpen(false);
       onSuccess?.();
     } catch (error) {
-      toast.error('Erro ao registrar lançamento');
+      toast.error('Erro ao salvar lançamento');
       console.error(error);
     }
   };
@@ -107,15 +163,21 @@ export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Lançamento
-        </Button>
-      </DialogTrigger>
+      {/* Only show trigger if not controlled (i.e., used as standalone button) */}
+      {!setControlledOpen && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Lançamento
+          </Button>
+        </DialogTrigger>
+      )}
+
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Registrar Lançamento Financeiro</DialogTitle>
+          <DialogTitle>
+            {lancamentoToEdit ? 'Editar Lançamento' : 'Registrar Lançamento Financeiro'}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -133,7 +195,10 @@ export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="categoria">Categoria</Label>
-              <Select onValueChange={(value) => setValue('categoria', value)}>
+              <Select
+                onValueChange={(value) => setValue('categoria', value)}
+                value={watch('categoria')} // Controlled value for edit mode
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
@@ -223,8 +288,8 @@ export function NovoLancamentoDialog({ onSuccess }: NovoLancamentoDialogProps) {
             <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className={cn(
                 "flex-1",
                 tipo === 'RECEITA' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'

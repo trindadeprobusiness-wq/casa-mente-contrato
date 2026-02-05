@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  DollarSign, 
-  TrendingDown, 
-  TrendingUp, 
-  Wallet, 
+import {
+  DollarSign,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
   Percent,
   Calendar,
   Filter,
@@ -28,7 +28,7 @@ import { LancamentoCard } from '@/components/financeiro/LancamentoCard';
 import { GraficoReceitaDespesa } from '@/components/financeiro/GraficoReceitaDespesa';
 import { GraficoProjecao } from '@/components/financeiro/GraficoProjecao';
 import { GraficoCategorias } from '@/components/financeiro/GraficoCategorias';
-import { ProjecaoMensal, TipoLancamento } from '@/types/financeiro';
+import { LancamentoFinanceiro, ProjecaoMensal, TipoLancamento } from '@/types/financeiro';
 import { toast } from 'sonner';
 
 type Periodo = 'mes_atual' | 'trimestre' | 'ano' | 'todos';
@@ -37,11 +37,12 @@ export default function Financeiro() {
   const [periodo, setPeriodo] = useState<Periodo>('mes_atual');
   const [projecao, setProjecao] = useState<ProjecaoMensal[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<TipoLancamento | 'todos'>('todos');
-  
-  const { 
-    lancamentos, 
-    loading, 
-    fetchLancamentos, 
+  const [lancamentoEmEdicao, setLancamentoEmEdicao] = useState<LancamentoFinanceiro | null>(null);
+
+  const {
+    lancamentos,
+    loading,
+    fetchLancamentos,
     deleteLancamento,
     calcularResumo,
     calcularPorCategoria,
@@ -72,7 +73,7 @@ export default function Financeiro() {
     }
 
     await fetchLancamentos({ dataInicio, dataFim });
-    
+
     const projecaoData = await calcularProjecaoAnual();
     setProjecao(projecaoData);
   };
@@ -88,6 +89,10 @@ export default function Financeiro() {
     } catch (error) {
       toast.error('Erro ao excluir lançamento');
     }
+  };
+
+  const handleEdit = (lancamento: LancamentoFinanceiro) => {
+    setLancamentoEmEdicao(lancamento);
   };
 
   const resumo = useMemo(() => calcularResumo(), [lancamentos]);
@@ -132,7 +137,7 @@ export default function Financeiro() {
             Gerencie receitas, despesas e acompanhe sua projeção anual
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
             <SelectTrigger className="w-[180px]">
@@ -146,7 +151,7 @@ export default function Financeiro() {
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <NovoLancamentoDialog onSuccess={carregarDados} />
         </div>
       </div>
@@ -173,7 +178,7 @@ export default function Financeiro() {
           titulo="Lucro Líquido"
           valor={resumo.lucro}
           icone={<Wallet className="h-5 w-5" />}
-          corIcone={resumo.lucro >= 0 
+          corIcone={resumo.lucro >= 0
             ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
             : "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
           }
@@ -201,12 +206,12 @@ export default function Financeiro() {
         <TabsContent value="visao_geral" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <GraficoReceitaDespesa lancamentos={lancamentos} />
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Últimos Lançamentos</CardTitle>
-                <Select 
-                  value={filtroTipo} 
+                <CardTitle className="lg:text-lg">Últimos Lançamentos</CardTitle>
+                <Select
+                  value={filtroTipo}
                   onValueChange={(v) => setFiltroTipo(v as TipoLancamento | 'todos')}
                 >
                   <SelectTrigger className="w-[130px]">
@@ -231,6 +236,7 @@ export default function Financeiro() {
                       key={lancamento.id}
                       lancamento={lancamento}
                       onDelete={handleDelete}
+                      onEdit={handleEdit}
                     />
                   ))
                 )}
@@ -242,12 +248,12 @@ export default function Financeiro() {
         {/* Custos */}
         <TabsContent value="custos" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <GraficoCategorias 
-              dados={despesasPorCategoria} 
+            <GraficoCategorias
+              dados={despesasPorCategoria}
               titulo="Distribuição de Custos"
               tipo="despesa"
             />
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Despesas do Período</CardTitle>
@@ -265,6 +271,7 @@ export default function Financeiro() {
                         key={lancamento.id}
                         lancamento={lancamento}
                         onDelete={handleDelete}
+                        onEdit={handleEdit}
                       />
                     ))
                 )}
@@ -289,7 +296,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -305,7 +312,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -327,12 +334,12 @@ export default function Financeiro() {
         {/* Faturamento */}
         <TabsContent value="faturamento" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <GraficoCategorias 
-              dados={receitasPorCategoria} 
+            <GraficoCategorias
+              dados={receitasPorCategoria}
               titulo="Fontes de Receita"
               tipo="receita"
             />
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Receitas do Período</CardTitle>
@@ -350,6 +357,7 @@ export default function Financeiro() {
                         key={lancamento.id}
                         lancamento={lancamento}
                         onDelete={handleDelete}
+                        onEdit={handleEdit}
                       />
                     ))
                 )}
@@ -374,7 +382,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -390,7 +398,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -412,7 +420,7 @@ export default function Financeiro() {
         {/* Projeção */}
         <TabsContent value="projecao" className="space-y-6">
           <GraficoProjecao dados={projecao} />
-          
+
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -427,7 +435,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -441,7 +449,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -455,7 +463,7 @@ export default function Financeiro() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -472,6 +480,17 @@ export default function Financeiro() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Dialog */}
+      <NovoLancamentoDialog
+        onSuccess={() => {
+          carregarDados();
+          setLancamentoEmEdicao(null);
+        }}
+        lancamentoToEdit={lancamentoEmEdicao}
+        open={!!lancamentoEmEdicao}
+        onOpenChange={(open) => !open && setLancamentoEmEdicao(null)}
+      />
     </div>
   );
 }
