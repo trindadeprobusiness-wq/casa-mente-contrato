@@ -42,6 +42,22 @@ export function ContractsList() {
         },
     });
 
+    const filteredContracts = contracts?.filter(contract => {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch =
+            contract.imoveis?.titulo?.toLowerCase().includes(searchLower) ||
+            contract.imoveis?.proprietario_nome?.toLowerCase().includes(searchLower) ||
+            contract.clientes?.nome?.toLowerCase().includes(searchLower);
+
+        const matchesStatus = statusFilter === "ALL" ? true : contract.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    // Stats
+    const totalActive = contracts?.filter(c => c.status === 'ATIVO').length || 0;
+    const totalRentValue = contracts?.filter(c => c.status === 'ATIVO').reduce((acc, curr) => acc + (curr.valor || 0), 0) || 0;
+
     const handleOpenCalculator = (contract: any) => {
         setSelectedContract(contract);
         setSimulatedRent(contract.valor);
@@ -64,21 +80,17 @@ export function ContractsList() {
         }
     };
 
-    const filteredContracts = contracts?.filter(contract => {
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch =
-            contract.imoveis?.titulo?.toLowerCase().includes(searchLower) ||
-            contract.imoveis?.proprietario_nome?.toLowerCase().includes(searchLower) ||
-            contract.clientes?.nome?.toLowerCase().includes(searchLower);
+    // Calculator Helpers
+    const calculateBreakdown = () => {
+        if (!selectedContract) return { fee: 0, net: 0, feePct: 0 };
+        const content = parseContratoContent(selectedContract.conteudo);
+        const feePct = content.taxa_administracao || selectedContract.taxa_administracao_percentual || 10;
+        const fee = simulatedRent * (feePct / 100);
+        const net = simulatedRent - fee;
+        return { fee, net, feePct };
+    };
 
-        const matchesStatus = statusFilter === "ALL" ? true : contract.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
-    });
-
-    // Stats
-    const totalActive = contracts?.filter(c => c.status === 'ATIVO').length || 0;
-    const totalRentValue = contracts?.filter(c => c.status === 'ATIVO').reduce((acc, curr) => acc + (curr.valor || 0), 0) || 0;
+    const { fee, net, feePct } = calculateBreakdown();
 
     if (isLoading) {
         return (
@@ -322,32 +334,43 @@ export function ContractsList() {
                         </div>
                     </Tabs>
                 </CardContent>
-                <div className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">Taxa ({feePct}%)</div>
-                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        R$ {fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </Card>
+
+            <NewContractDialog
+                open={isNewContractOpen}
+                onOpenChange={setIsNewContractOpen}
+                contractToEdit={selectedContract}
+            />
+
+            <Dialog open={isCalcOpen} onOpenChange={setIsCalcOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Simular Repasse</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label>Valor do Aluguel</Label>
+                            <Input
+                                type="number"
+                                value={simulatedRent}
+                                onChange={(e) => setSimulatedRent(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="bg-muted p-4 rounded-lg space-y-2">
+                            <div className="flex justify-between">
+                                <span>Taxa Adm ({feePct}%):</span>
+                                <span>R$ {fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Líquido:</span>
+                                <span className="text-green-600">
+                                    R$ {net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div className="p-4 rounded-lg border bg-green-50/50 dark:bg-green-900/10 space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">Líquido Prophetário</div>
-                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                        R$ {net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </div>
-                </div>
+                </DialogContent>
+            </Dialog>
         </div>
-                            </div >
-                        </div >
-                    </DialogContent >
-                </Dialog >
-            </Card >
-        <NewContractDialog
-            open={isNewContractOpen}
-            onOpenChange={(open) => {
-                setIsNewContractOpen(open);
-                if (!open) setSelectedContract(null);
-            }}
-            contractToEdit={selectedContract}
-        />
-        </>
     );
 }

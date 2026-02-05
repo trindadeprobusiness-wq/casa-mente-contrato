@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FileText, Loader2, CalendarDays, DollarSign, Wallet, Search, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -206,7 +207,15 @@ export function BillsList() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {/* Actions placeholder */}
+                                                    <div className="flex justify-end pr-4">
+                                                        {bill.boleto_url && (
+                                                            <a href={bill.boleto_url} target="_blank" rel="noopener noreferrer">
+                                                                <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 p-0 shadow-sm border border-blue-100">
+                                                                    <FileText className="h-4 w-4" />
+                                                                </Button>
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
