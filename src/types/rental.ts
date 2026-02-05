@@ -6,7 +6,6 @@ export interface ContratoContent {
     juros_mora?: number;
     meses_duracao?: string;
     data_fim_calculada?: string;
-    asaas_integrated?: boolean;
 }
 
 export function parseContratoContent(conteudo: string | null): ContratoContent {
