@@ -32,10 +32,7 @@ export function ContractsList() {
         try {
             const { error } = await supabase
                 .from('contratos')
-                .update({ status: 'ENCERRADO', ativo: false }) // Assuming 'ativo' column typically exists or just status is enough. Based on table schema viewed before, let's stick to status. If 'ativo' exists in types, good. If not, supabase will ignore or error. Let's check schema or just use status. 
-                // Correction: In NewContractDialog, it inserts status: 'ATIVO'. It doesn't seem to use 'ativo' boolean column in the insert, but maybe it exists.
-                // Let's check the select in line 30: .select('*...').
-                // Let's just update status for now.
+                .update({ status: 'ENCERRADO' }) // Column 'ativo' does not exist on 'contratos' table
                 .eq('id', contractToTerminate.id);
 
             if (error) throw error;
