@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Phone, MoreVertical, Pencil, Trash, Home } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,8 @@ const statusColors: Record<StatusFunil, string> = {
 export default function Clientes() {
   const { clientes, removeCliente, imoveis, fetchImoveis } = useCRMStore();
   const { toast } = useToast();
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clienteToEdit, setClienteToEdit] = useState<Cliente | null>(null);

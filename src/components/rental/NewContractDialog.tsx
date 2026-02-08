@@ -206,8 +206,21 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
 
                             <div className="space-y-3">
                                 <div className="space-y-1.5">
-                                    <Label>Imóvel</Label>
-                                    <Select value={propertyId} onValueChange={setPropertyId} disabled={isEditing}>
+                                    <div className="flex items-center justify-between">
+                                        <Label>Imóvel</Label>
+                                        {selectedProperty && (
+                                            <Button
+                                                variant="link"
+                                                size="sm"
+                                                className="h-auto p-0 text-xs text-blue-600"
+                                                onClick={() => window.open(`/imoveis?q=${encodeURIComponent(selectedProperty.titulo)}`, '_blank')}
+                                            >
+                                                Editar Imóvel
+                                                <UploadCloud className="w-3 h-3 ml-1" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <Select value={propertyId} onValueChange={setPropertyId}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecione o imóvel" />
                                         </SelectTrigger>
@@ -230,8 +243,26 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <Label>Inquilino</Label>
-                                    <Select value={clientId} onValueChange={setClientId} disabled={isEditing}>
+                                    <div className="flex items-center justify-between">
+                                        <Label>Inquilino</Label>
+                                        {clientId && (
+                                            <Button
+                                                variant="link"
+                                                size="sm"
+                                                className="h-auto p-0 text-xs text-blue-600"
+                                                onClick={() => {
+                                                    const client = clients?.find(c => c.id === clientId);
+                                                    if (client) {
+                                                        window.open(`/clientes?q=${encodeURIComponent(client.nome)}`, '_blank');
+                                                    }
+                                                }}
+                                            >
+                                                Editar Inquilino
+                                                <UploadCloud className="w-3 h-3 ml-1" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <Select value={clientId} onValueChange={setClientId}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecione o cliente" />
                                         </SelectTrigger>

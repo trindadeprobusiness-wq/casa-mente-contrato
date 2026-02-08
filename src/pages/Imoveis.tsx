@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Bed, Car, Ruler, Image } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,8 +26,9 @@ const tipoLabels: Record<TipoImovel, string> = {
 
 export default function Imoveis() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { imoveis } = useCRMStore();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [imovelToEdit, setImovelToEdit] = useState<any>(null);
