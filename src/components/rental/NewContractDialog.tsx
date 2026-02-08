@@ -126,7 +126,8 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                 data_inicio: startDate || new Date().toISOString(),
                 dia_vencimento: parseInt(dueDay),
                 conteudo: JSON.stringify({
-                    obs: "Contrato Gerado/Atualizado Manualmente",
+                    ...(contractToEdit ? parseContratoContent(contractToEdit.conteudo) : {}),
+                    obs: "Contrato Gerado/Atualizado Manualmente", // Pode ser melhorado para preserver obs anterior se desejar, mas o foco é não perder as flags
                     dia_repasse: parseInt(payoutDay),
                     taxa_administracao: feePct,
                     meses_duracao: duration,
