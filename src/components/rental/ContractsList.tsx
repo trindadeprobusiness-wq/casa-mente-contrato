@@ -27,25 +27,23 @@ export function ContractsList() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
 
-    const handleTerminateContract = async () => {
+    const handleDeleteContract = async () => {
         if (!contractToTerminate) return;
         try {
             const { error } = await supabase
                 .from('contratos')
-                .update({ status: 'ENCERRADO' }) // Column 'ativo' does not exist on 'contratos' table
+                .delete()
                 .eq('id', contractToTerminate.id);
 
             if (error) throw error;
 
-            toast.success("Contrato encerrado com sucesso.");
+            toast.success("Contrato excluído com sucesso.");
             setContractToTerminate(null);
-            // Invalidate queries to refresh list
-            // Note: queryClient needs to be instantiated. I need to make sure useQueryClient is imported.
-            // Looking at line 2, it imports useQuery. I need to add useQueryClient there too.
-            window.location.reload(); // Fallback if queryClient not totally set up in this context yet, but better to use it.
+
+            window.location.reload();
         } catch (error: any) {
-            console.error("Erro ao encerrar:", error);
-            toast.error("Erro ao encerrar contrato: " + error.message);
+            console.error("Erro ao excluir:", error);
+            toast.error("Erro ao excluir contrato: " + error.message);
         }
     };
 
@@ -318,7 +316,7 @@ export function ContractsList() {
                                                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                                                 onClick={() => setContractToTerminate(contract)}
                                                             >
-                                                                Encerrar Contrato
+                                                                Excluir Contrato
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -405,10 +403,10 @@ export function ContractsList() {
             <AlertDialog open={!!contractToTerminate} onOpenChange={(open) => !open && setContractToTerminate(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Encerrar Contrato?</AlertDialogTitle>
+                        <AlertDialogTitle>Excluir Contrato?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta ação mudará o status do contrato para <strong>ENCERRADO</strong>.
-                            O histórico financeiro será mantido, mas não serão geradas novas faturas.
+                            Esta ação <strong>excluirá permanentemente</strong> o contrato e todo o seu histórico.
+                            Essa ação não pode ser desfeita.
                             <br /><br />
                             Contrato: <strong>{contractToTerminate?.imoveis?.titulo}</strong>
                         </AlertDialogDescription>
@@ -416,10 +414,10 @@ export function ContractsList() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleTerminateContract}
+                            onClick={handleDeleteContract}
                             className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                         >
-                            Encerrar Definitivamente
+                            Excluir Definitivamente
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
