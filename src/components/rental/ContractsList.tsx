@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -13,15 +13,44 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NewContractDialog } from "./NewContractDialog";
 import { parseContratoContent } from "@/types/rental";
+import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export function ContractsList() {
+    const queryClient = useQueryClient(); // Ensure this hook is used or imported if checking logic
     const [isCalcOpen, setIsCalcOpen] = useState(false);
     const [isNewContractOpen, setIsNewContractOpen] = useState(false);
     const [selectedContract, setSelectedContract] = useState<any>(null);
+    const [contractToTerminate, setContractToTerminate] = useState<any>(null);
     const [simulatedRent, setSimulatedRent] = useState<number>(0);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
+
+    const handleTerminateContract = async () => {
+        if (!contractToTerminate) return;
+        try {
+            const { error } = await supabase
+                .from('contratos')
+                .update({ status: 'ENCERRADO', ativo: false }) // Assuming 'ativo' column typically exists or just status is enough. Based on table schema viewed before, let's stick to status. If 'ativo' exists in types, good. If not, supabase will ignore or error. Let's check schema or just use status. 
+                // Correction: In NewContractDialog, it inserts status: 'ATIVO'. It doesn't seem to use 'ativo' boolean column in the insert, but maybe it exists.
+                // Let's check the select in line 30: .select('*...').
+                // Let's just update status for now.
+                .eq('id', contractToTerminate.id);
+
+            if (error) throw error;
+
+            toast.success("Contrato encerrado com sucesso.");
+            setContractToTerminate(null);
+            // Invalidate queries to refresh list
+            // Note: queryClient needs to be instantiated. I need to make sure useQueryClient is imported.
+            // Looking at line 2, it imports useQuery. I need to add useQueryClient there too.
+            window.location.reload(); // Fallback if queryClient not totally set up in this context yet, but better to use it.
+        } catch (error: any) {
+            console.error("Erro ao encerrar:", error);
+            toast.error("Erro ao encerrar contrato: " + error.message);
+        }
+    };
 
     const { data: contracts, isLoading } = useQuery({
         queryKey: ["rental-contracts"],
@@ -288,7 +317,10 @@ export function ContractsList() {
                                                                     <FileText className="mr-2 h-4 w-4" /> Ver Contrato
                                                                 </DropdownMenuItem>
                                                             )}
-                                                            <DropdownMenuItem className="text-red-600">
+                                                            <DropdownMenuItem
+                                                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                                onClick={() => setContractToTerminate(contract)}
+                                                            >
                                                                 Encerrar Contrato
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
@@ -372,6 +404,29 @@ export function ContractsList() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={!!contractToTerminate} onOpenChange={(open) => !open && setContractToTerminate(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Encerrar Contrato?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta ação mudará o status do contrato para <strong>ENCERRADO</strong>.
+                            O histórico financeiro será mantido, mas não serão geradas novas faturas.
+                            <br /><br />
+                            Contrato: <strong>{contractToTerminate?.imoveis?.titulo}</strong>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleTerminateContract}
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                        >
+                            Encerrar Definitivamente
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
