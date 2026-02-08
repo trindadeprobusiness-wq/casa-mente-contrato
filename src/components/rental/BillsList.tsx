@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function BillsList() {
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
 
@@ -35,6 +37,30 @@ export function BillsList() {
             return data;
         },
     });
+
+    const handleConfirmPayment = async (billId: string, value: number) => {
+        if (!confirm("Confirmar o recebimento desta fatura?")) return;
+
+        try {
+            const { error } = await supabase
+                .from("faturas_aluguel")
+                .update({
+                    status: 'PAGO',
+                    data_pagamento: new Date().toISOString(),
+                    valor_pago: value
+                })
+                .eq('id', billId);
+
+            if (error) throw error;
+
+            toast.success("Pagamento confirmado com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ["rental-bills"] });
+            queryClient.invalidateQueries({ queryKey: ["rental-contracts"] }); // Update charts potentially
+        } catch (error: any) {
+            console.error("Erro ao baixar fatura:", error);
+            toast.error("Erro ao confirmar pagamento: " + error.message);
+        }
+    };
 
     const filteredBills = bills?.filter(bill => {
         const matchesSearch =
@@ -115,7 +141,7 @@ export function BillsList() {
                                 Gestão de Faturas
                             </CardTitle>
                             <CardDescription>
-                                Controle inteligente de cobranças
+                                Controle financeiro e baixa manual de recebimentos
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -158,8 +184,7 @@ export function BillsList() {
                                             <TableHead>Vencimento</TableHead>
                                             <TableHead>Valor</TableHead>
                                             <TableHead>Status</TableHead>
-                                            <TableHead>Integração</TableHead>
-                                            <TableHead className="w-[50px]"></TableHead>
+                                            <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -197,20 +222,32 @@ export function BillsList() {
                                                         {getStatusLabel(bill.status)}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell>
-                                                    {bill.external_id ? (
-                                                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">
-                                                            Asaas
-                                                        </Badge>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">-</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex justify-end pr-4">
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        {bill.status === 'PENDENTE' || bill.status === 'ATRASADO' ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="default"
+                                                                className="h-8 bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                                                                onClick={() => handleConfirmPayment(bill.id, bill.valor_total)}
+                                                                title="Confirmar Pagamento (Baixar Fatura)"
+                                                            >
+                                                                <CheckCircle className="h-4 w-4 mr-1.5" />
+                                                                Baixar Fatura
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground flex items-center justify-end h-8 px-3">
+                                                                {bill.status === 'PAGO' ? (
+                                                                    <span className="flex items-center text-green-600">
+                                                                        <CheckCircle className="h-3 w-3 mr-1" /> Pago
+                                                                    </span>
+                                                                ) : '-'}
+                                                            </span>
+                                                        )}
+
                                                         {bill.boleto_url && (
                                                             <a href={bill.boleto_url} target="_blank" rel="noopener noreferrer">
-                                                                <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 p-0 shadow-sm border border-blue-100">
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-blue-600 hover:bg-blue-50">
                                                                     <FileText className="h-4 w-4" />
                                                                 </Button>
                                                             </a>

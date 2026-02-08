@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ArrowRightLeft, Loader2, CalendarDays, Search, AlertCircle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,6 +34,30 @@ export function RepassesList() {
             return data;
         },
     });
+
+    const queryClient = useQueryClient();
+
+    const handleConfirmPayout = async (payoutId: string, value: number) => {
+        if (!confirm("Confirmar que a transferência via PIX foi realizada para o proprietário?")) return;
+
+        try {
+            const { error } = await supabase
+                .from("repasses_proprietario")
+                .update({
+                    status: 'CONFIRMADO',
+                    // data_transferencia: new Date().toISOString() // Uncomment if column exists
+                })
+                .eq('id', payoutId);
+
+            if (error) throw error;
+
+            toast.success("Repasse confirmado e registrado com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ["rental-payouts"] });
+        } catch (error: any) {
+            console.error("Erro ao confirmar repasse:", error);
+            toast.error("Erro ao confirmar repasse: " + error.message);
+        }
+    };
 
     const filteredPayouts = payouts?.filter(payout => {
         const matchesSearch =
@@ -147,6 +173,7 @@ export function RepassesList() {
                                             <TableHead>Taxa Adm</TableHead>
                                             <TableHead>Valor Líquido</TableHead>
                                             <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Ação</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -179,6 +206,19 @@ export function RepassesList() {
                                                     <Badge variant="outline" className={getStatusStyle(payout.status)}>
                                                         {payout.status}
                                                     </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {payout.status === 'AGENDADO' || payout.status === 'ERRO' ? (
+                                                        <Button
+                                                            size="sm"
+                                                            className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                                                            onClick={() => handleConfirmPayout(payout.id, payout.valor_liquido_repasse)}
+                                                        >
+                                                            Confirmar Envio
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">-</span>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
