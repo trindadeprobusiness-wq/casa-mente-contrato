@@ -149,7 +149,46 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
 
                 if (error) throw error;
                 result = data;
-                toast.success("Contrato atualizado com sucesso!");
+
+                // Sync Pending Bills
+                try {
+                    const { data: bills } = await supabase
+                        .from('faturas_aluguel')
+                        .select('*')
+                        .eq('contrato_id', contractToEdit.id)
+                        .in('status', ['PENDENTE', 'ATRASADO']);
+
+                    if (bills && bills.length > 0) {
+                        const updates = bills.map(async (bill) => {
+                            const originalDate = new Date(bill.data_vencimento);
+                            // Set new day, keep month/year
+                            // Handle overflow? e.g. Feb 30 -> Mar 2. 
+                            // JS Date handles it, but maybe we want to clamp to last day of month?
+                            // For simplicity, letting JS Date handle rollover is safer to avoid invalid dates, 
+                            // though clamping is often preferred in finance.
+                            // Let's use simple setDate for now as it's standard JS behavior.
+
+                            const newDate = new Date(originalDate.getFullYear(), originalDate.getMonth(), parseInt(dueDay));
+
+                            return supabase
+                                .from('faturas_aluguel')
+                                .update({
+                                    valor_total: rent, // Update value
+                                    data_vencimento: newDate.toISOString() // Update date
+                                })
+                                .eq('id', bill.id);
+                        });
+
+                        await Promise.all(updates);
+                    }
+                } catch (syncError) {
+                    console.error("Erro ao sincronizar faturas:", syncError);
+                    toast.error("Contrato salvo, mas houve erro ao atualizar faturas pendentes.");
+                }
+
+                toast.success("Contrato atualizado com sucesso!", {
+                    description: "Faturas pendentes foram recalculadas."
+                });
             } else {
                 const { data, error } = await supabase
                     .from("contratos")

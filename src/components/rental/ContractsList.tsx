@@ -249,7 +249,7 @@ export function ContractsList() {
                                                         </Badge>
                                                         {/* Asaas Badge - Checks if content has Asaas metadata or simply mocks it if user tagged it */}
                                                         {(content.asaas_integrated) && (
-                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] h-5">
+                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] h-5 whitespace-nowrap px-2">
                                                                 Asaas (Manual)
                                                             </Badge>
                                                         )}

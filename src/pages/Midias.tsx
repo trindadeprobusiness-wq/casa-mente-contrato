@@ -12,6 +12,7 @@ import { VideoCard } from '@/components/midias/VideoCard';
 import { VideoPlayerDialog } from '@/components/midias/VideoPlayerDialog';
 import { EditarVideoDialog } from '@/components/midias/EditarVideoDialog';
 import { CompartilharVideoDialog } from '@/components/midias/CompartilharVideoDialog';
+import { FotosIA } from '@/components/midias/FotosIA';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ImovelSimples {
@@ -33,13 +34,13 @@ const TIPOS_VIDEO: { value: TipoVideo | 'TODOS'; label: string }[] = [
 
 export default function Midias() {
   const { videos, loading, uploading, uploadProgress, uploadVideo, deleteVideo, updateVideo, incrementVisualizacoes, getTemporaryShareUrl } = useVideos();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState<TipoVideo | 'TODOS'>('TODOS');
   const [imovelFilter, setImovelFilter] = useState<string>('TODOS');
   const [sortBy, setSortBy] = useState<SortOption>('recentes');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  
+
   const [imoveis, setImoveis] = useState<ImovelSimples[]>([]);
   const [playerVideo, setPlayerVideo] = useState<VideoRow | null>(null);
   const [editVideo, setEditVideo] = useState<VideoRow | null>(null);
@@ -65,7 +66,7 @@ export default function Midias() {
     // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(v => 
+      result = result.filter(v =>
         v.titulo.toLowerCase().includes(term) ||
         v.descricao?.toLowerCase().includes(term)
       );
@@ -160,7 +161,13 @@ export default function Midias() {
         <TabsList>
           <TabsTrigger value="videos">Vídeos</TabsTrigger>
           <TabsTrigger value="upload">Upload</TabsTrigger>
+          <TabsTrigger value="fotos-ia">✨ Fotos IA</TabsTrigger>
         </TabsList>
+
+        {/* Fotos IA Tab */}
+        <TabsContent value="fotos-ia">
+          <FotosIA />
+        </TabsContent>
 
         {/* Upload Tab */}
         <TabsContent value="upload">
@@ -290,14 +297,14 @@ export default function Midias() {
               <CardContent className="p-12 text-center">
                 <Video className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                 <p className="text-muted-foreground">
-                  {videos.length === 0 
+                  {videos.length === 0
                     ? 'Nenhum vídeo cadastrado ainda. Faça upload do primeiro vídeo!'
                     : 'Nenhum vídeo encontrado com os filtros aplicados.'}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <div className={viewMode === 'grid' 
+            <div className={viewMode === 'grid'
               ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
               : "flex flex-col gap-2"
             }>
