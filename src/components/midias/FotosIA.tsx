@@ -17,9 +17,48 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-const AI_PROMPT = `Aja como um especialista em edição profissional de imagens imobiliárias para anúncios no Facebook Ads. Sua tarefa é melhorar a imagem enviada mantendo 100% da estrutura real do ambiente. Não altere layout, arquitetura, proporção, formato, dimensões, tipo de piso, paredes, janelas ou qualquer elemento estrutural. Melhore apenas a qualidade visual geral da foto de forma natural, realista e fiel ao ambiente original. Você DEVE: melhorar iluminação, brilho, contraste e nitidez de maneira natural; corrigir cores e balanço de branco de forma leve; remover somente sujeira, ruídos visuais e pequenos objetos desnecessários; melhorar a textura das superfícies sem alterar o material real; reforçar sensação de limpeza, organização e cuidado; deixar a foto mais atrativa, vibrante e chamativa, mas ainda natural; manter coerência de estilo caso eu envie várias fotos do mesmo imóvel. Você NÃO DEVE, em hipótese alguma: adicionar objetos, móveis, decorações ou elementos inexistentes; modificar móveis originais; trocar cores reais das paredes ou móveis (apenas corrigir iluminação); alterar layout, arquitetura ou dimensões; criar elementos que não estavam na imagem original. O objetivo é entregar uma foto realista e profissional, no estilo de fotografia imobiliária de catálogo, pronta para conversão em Facebook Ads — natural, bem iluminada e visualmente atrativa. Retorne APENAS a imagem melhorada, sem texto ou explicações.`;
+// Prompt: Gemini analyzes the image and returns JSON enhancement parameters
+const AI_ANALYSIS_PROMPT = `You are a professional real estate photo editor AI. Analyze this property photo and return ONLY a JSON object (no markdown, no explanation) with optimal enhancement parameters to make it look like a professional real estate listing photo for Facebook Ads.
+
+The JSON must have exactly these keys with numeric values:
+{
+  "brightness": <number between 0.85 and 1.25, where 1.0 = no change>,
+  "contrast": <number between 0.90 and 1.35, where 1.0 = no change>,
+  "saturation": <number between 0.90 and 1.30, where 1.0 = no change>,
+  "warmth": <number between -15 and 15, positive = warmer/yellower, negative = cooler/bluer>,
+  "shadows": <number between 0 and 40, amount to lift dark areas>,
+  "highlights": <number between 0 and 30, amount to reduce blown highlights>,
+  "sharpness": <number between 0 and 1, sharpening strength>
+}
+
+Rules:
+- Improve illumination, contrast and colors naturally
+- Make the photo more vibrant and attractive but still realistic
+- Correct white balance naturally
+- Enhance texture without changing real materials
+- Return ONLY the JSON object, nothing else`;
 
 type WatermarkPosition = 'bottom-left' | 'bottom-right';
+
+interface EnhancementParams {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    warmth: number;
+    shadows: number;
+    highlights: number;
+    sharpness: number;
+}
+
+const DEFAULT_PARAMS: EnhancementParams = {
+    brightness: 1.08,
+    contrast: 1.15,
+    saturation: 1.10,
+    warmth: 5,
+    shadows: 15,
+    highlights: 10,
+    sharpness: 0.4,
+};
 
 interface ProcessedImage {
     id: string;
@@ -39,6 +78,7 @@ interface WatermarkConfig {
 
 const WATERMARK_STORAGE_KEY = 'fotosIA_watermark_logo';
 const WATERMARK_CONFIG_KEY = 'fotosIA_watermark_config';
+
 
 // ───────────────────────────────────────────────
 // Before/After Slider Component
@@ -165,45 +205,171 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 // ───────────────────────────────────────────────
-// Process image via Gemini
+// Step 1: Ask Gemini to analyze photo → return JSON params
 // ───────────────────────────────────────────────
-async function processImageWithGemini(file: File, apiKey: string): Promise<string> {
+async function analyzeWithGemini(file: File, apiKey: string): Promise<EnhancementParams> {
     const base64 = await fileToBase64(file);
     const mimeType = file.type;
 
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: AI_PROMPT },
-                        { inline_data: { mime_type: mimeType, data: base64 } }
-                    ]
-                }],
-                generationConfig: { response_mime_type: 'image/jpeg' }
-            })
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: AI_ANALYSIS_PROMPT },
+                            { inline_data: { mime_type: mimeType, data: base64 } }
+                        ]
+                    }],
+                    generationConfig: {
+                        response_mime_type: 'application/json',
+                        temperature: 0.2,
+                        maxOutputTokens: 256
+                    }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            console.warn('Gemini analysis failed:', err?.error?.message);
+            return DEFAULT_PARAMS;
         }
-    );
 
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `Erro API: ${response.status}`);
-    }
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    const data = await response.json();
-    const part = data?.candidates?.[0]?.content?.parts?.[0];
-    if (part?.inline_data?.data) {
-        return `data:image/jpeg;base64,${part.inline_data.data}`;
+        // Parse JSON from response (remove markdown fences if present)
+        const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(cleaned) as Partial<EnhancementParams>;
+
+        // Merge with defaults and clamp values
+        return {
+            brightness: Math.min(1.30, Math.max(0.80, parsed.brightness ?? DEFAULT_PARAMS.brightness)),
+            contrast: Math.min(1.40, Math.max(0.85, parsed.contrast ?? DEFAULT_PARAMS.contrast)),
+            saturation: Math.min(1.35, Math.max(0.85, parsed.saturation ?? DEFAULT_PARAMS.saturation)),
+            warmth: Math.min(20, Math.max(-20, parsed.warmth ?? DEFAULT_PARAMS.warmth)),
+            shadows: Math.min(50, Math.max(0, parsed.shadows ?? DEFAULT_PARAMS.shadows)),
+            highlights: Math.min(40, Math.max(0, parsed.highlights ?? DEFAULT_PARAMS.highlights)),
+            sharpness: Math.min(1, Math.max(0, parsed.sharpness ?? DEFAULT_PARAMS.sharpness)),
+        };
+    } catch (e) {
+        console.warn('Gemini analysis error, using defaults:', e);
+        return DEFAULT_PARAMS;
     }
-    throw new Error('A API não retornou uma imagem. Verifique sua chave e plano.');
+}
+
+// ───────────────────────────────────────────────
+// Step 2: Apply enhancement params via Canvas
+// ───────────────────────────────────────────────
+async function applyEnhancement(file: File, params: EnhancementParams): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const d = imageData.data;
+
+            for (let i = 0; i < d.length; i += 4) {
+                let r = d[i], g = d[i + 1], b = d[i + 2];
+
+                // 1. Shadow lifting (lighten dark areas)
+                const luminance = (r + g + b) / 3;
+                const shadowFactor = Math.max(0, 1 - luminance / 128);
+                const shadowLift = params.shadows * shadowFactor;
+                r += shadowLift; g += shadowLift; b += shadowLift;
+
+                // 2. Highlight recovery (reduce blown highlights)
+                const hiLuminance = (r + g + b) / 3;
+                if (hiLuminance > 200) {
+                    const excess = (hiLuminance - 200) / 55;
+                    const reduce = params.highlights * excess;
+                    r -= reduce; g -= reduce; b -= reduce;
+                }
+
+                // 3. Brightness
+                r *= params.brightness; g *= params.brightness; b *= params.brightness;
+
+                // 4. Contrast
+                const c = params.contrast;
+                r = c * (r - 128) + 128;
+                g = c * (g - 128) + 128;
+                b = c * (b - 128) + 128;
+
+                // 5. Warmth (shift colour temperature)
+                r += params.warmth;
+                b -= params.warmth * 0.6;
+
+                // 6. Saturation via luminosity
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                r = lum + params.saturation * (r - lum);
+                g = lum + params.saturation * (g - lum);
+                b = lum + params.saturation * (b - lum);
+
+                // 7. Clamp
+                d[i] = Math.min(255, Math.max(0, r));
+                d[i + 1] = Math.min(255, Math.max(0, g));
+                d[i + 2] = Math.min(255, Math.max(0, b));
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            // 8. Sharpness via unsharp mask (draw blurred copy and blend)
+            if (params.sharpness > 0) {
+                const sharpCanvas = document.createElement('canvas');
+                sharpCanvas.width = canvas.width;
+                sharpCanvas.height = canvas.height;
+                const sharpCtx = sharpCanvas.getContext('2d')!;
+                sharpCtx.filter = 'blur(1px)';
+                sharpCtx.drawImage(canvas, 0, 0);
+
+                // Mix: sharp = original + amount*(original - blurred)
+                const orig = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const blur = sharpCtx.getImageData(0, 0, canvas.width, canvas.height);
+                const od = orig.data, bd = blur.data;
+                for (let i = 0; i < od.length; i += 4) {
+                    od[i] = Math.min(255, Math.max(0, od[i] + params.sharpness * (od[i] - bd[i])));
+                    od[i + 1] = Math.min(255, Math.max(0, od[i + 1] + params.sharpness * (od[i + 1] - bd[i + 1])));
+                    od[i + 2] = Math.min(255, Math.max(0, od[i + 2] + params.sharpness * (od[i + 2] - bd[i + 2])));
+                }
+                ctx.putImageData(orig, 0, 0);
+            }
+
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/jpeg', 0.93));
+        };
+
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Erro ao carregar imagem')); };
+        img.src = url;
+    });
+}
+
+// ───────────────────────────────────────────────
+// Main processor: Gemini → Canvas
+// ───────────────────────────────────────────────
+async function processImageWithGemini(file: File, apiKey: string): Promise<string> {
+    // If no API key, use default params
+    const params = apiKey
+        ? await analyzeWithGemini(file, apiKey)
+        : DEFAULT_PARAMS;
+
+    return applyEnhancement(file, params);
 }
 
 // ───────────────────────────────────────────────
 // Download helpers
 // ───────────────────────────────────────────────
+
 function downloadDataUrl(dataUrl: string, filename: string) {
     const a = document.createElement('a');
     a.href = dataUrl;
