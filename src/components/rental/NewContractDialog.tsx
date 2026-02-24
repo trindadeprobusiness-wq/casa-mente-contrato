@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -162,12 +163,6 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                         const updates = bills.map(async (bill) => {
                             const originalDate = new Date(bill.data_vencimento);
                             // Set new day, keep month/year
-                            // Handle overflow? e.g. Feb 30 -> Mar 2. 
-                            // JS Date handles it, but maybe we want to clamp to last day of month?
-                            // For simplicity, letting JS Date handle rollover is safer to avoid invalid dates, 
-                            // though clamping is often preferred in finance.
-                            // Let's use simple setDate for now as it's standard JS behavior.
-
                             const newDate = new Date(originalDate.getFullYear(), originalDate.getMonth(), parseInt(dueDay));
 
                             return supabase
@@ -198,9 +193,49 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
 
                 if (error) throw error;
                 result = data;
-                toast.success("Contrato criado com sucesso!", {
-                    description: "Contrato ativo e pronto para gerenciamento."
-                });
+
+                // Generate First Bill for the new contract
+                try {
+                    const now = new Date();
+                    const start = new Date(startDate || now);
+                    // Start month/year
+                    const refMonth = start.getMonth();
+                    const refYear = start.getFullYear();
+                    const dueD = parseInt(dueDay);
+
+                    const dueDate = new Date(refYear, refMonth, dueD);
+                    // If due date has already passed for this month, maybe they start next month?
+                    // Usually we just generate the first month's bill anyway.
+                    const correctStatus = dueDate < now ? 'ATRASADO' : 'PENDENTE';
+                    const referenceMonthStr = format(dueDate, 'MM/yyyy');
+
+                    const { error: billError } = await supabase
+                        .from('faturas_aluguel')
+                        .insert({
+                            contrato_id: result.id,
+                            cliente_id: clientId,
+                            imovel_id: propertyId,
+                            corretor_id: corretor.id,
+                            valor_aluguel: rent,
+                            data_vencimento: dueDate.toISOString(),
+                            status: correctStatus,
+                            mes_referencia: referenceMonthStr
+                        });
+
+                    if (billError) {
+                        console.error("Erro ao gerar primeira fatura:", billError);
+                        toast.error("Contrato criado, mas erro ao gerar primeira fatura.");
+                    } else {
+                        toast.success("Contrato e fatura criados com sucesso!", {
+                            description: "Contrato ativo e primeira fatura gerada."
+                        });
+                    }
+                } catch (err) {
+                    console.error(err);
+                    toast.success("Contrato criado com sucesso!", {
+                        description: "Contrato ativo, porém verifique as faturas."
+                    });
+                }
             }
 
             return result;

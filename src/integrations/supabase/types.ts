@@ -89,6 +89,10 @@ export type Database = {
         Row: {
           id: string
           contrato_id: string
+          cliente_id: string
+          imovel_id: string
+          corretor_id: string
+          valor_aluguel: number
           valor_total: number
           data_vencimento: string
           status: string
@@ -101,7 +105,11 @@ export type Database = {
         Insert: {
           id?: string
           contrato_id: string
-          valor_total: number
+          cliente_id: string
+          imovel_id: string
+          corretor_id: string
+          valor_aluguel: number
+          valor_total?: number
           data_vencimento: string
           status?: string
           mes_referencia?: string | null
@@ -113,6 +121,10 @@ export type Database = {
         Update: {
           id?: string
           contrato_id?: string
+          cliente_id?: string
+          imovel_id?: string
+          corretor_id?: string
+          valor_aluguel?: number
           valor_total?: number
           data_vencimento?: string
           status?: string
@@ -128,6 +140,27 @@ export type Database = {
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faturas_aluguel_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faturas_aluguel_imovel_id_fkey"
+            columns: ["imovel_id"]
+            isOneToOne: false
+            referencedRelation: "imoveis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faturas_aluguel_corretor_id_fkey"
+            columns: ["corretor_id"]
+            isOneToOne: false
+            referencedRelation: "corretores"
             referencedColumns: ["id"]
           },
         ]
