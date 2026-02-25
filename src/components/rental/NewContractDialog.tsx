@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calculator, CalendarDays, UploadCloud } from "lucide-react";
+import { Loader2, Calculator, CalendarDays, UploadCloud, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { ContractUpload } from "./ContractUpload";
 import { parseContratoContent } from "@/types/rental";
 import { Database } from "@/integrations/supabase/types";
+import { NovoImovelDialog } from "@/components/imoveis/NovoImovelDialog";
+import { NovoClienteDialog } from "@/components/clientes/NovoClienteDialog";
 
 type TipoContrato = Database["public"]["Enums"]["tipo_contrato"];
 
@@ -37,6 +39,10 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
     const [payoutDay, setPayoutDay] = useState("15");
     const [duration, setDuration] = useState("30");
     const [contractFile, setContractFile] = useState<File | null>(null);
+
+    // Dialog states
+    const [isNovoImovelOpen, setIsNovoImovelOpen] = useState(false);
+    const [isNovoClienteOpen, setIsNovoClienteOpen] = useState(false);
 
     // Populate form when editing
     useEffect(() => {
@@ -79,6 +85,20 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
     });
 
     const selectedProperty = properties?.find(p => p.id === propertyId);
+
+    const handleNovoImovelClose = (open: boolean) => {
+        setIsNovoImovelOpen(open);
+        if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["properties-select"] });
+        }
+    };
+
+    const handleNovoClienteClose = (open: boolean) => {
+        setIsNovoClienteOpen(open);
+        if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["clients-select"] });
+        }
+    };
 
     // Calculations
     const rent = parseFloat(rentValue) || 0;
@@ -282,17 +302,29 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                 <div className="space-y-1.5">
                                     <div className="flex items-center justify-between">
                                         <Label>Imóvel</Label>
-                                        {selectedProperty && (
+                                        <div className="flex gap-2 items-center">
                                             <Button
-                                                variant="link"
+                                                variant="ghost"
                                                 size="sm"
-                                                className="h-auto p-0 text-xs text-blue-600"
-                                                onClick={() => window.open(`/imoveis?q=${encodeURIComponent(selectedProperty.titulo)}`, '_blank')}
+                                                type="button"
+                                                className="h-auto p-0 text-xs text-green-600 hover:text-green-700"
+                                                onClick={() => setIsNovoImovelOpen(true)}
                                             >
-                                                Editar Imóvel
-                                                <UploadCloud className="w-3 h-3 ml-1" />
+                                                <Plus className="w-3 h-3 mr-1" /> Novo Imóvel
                                             </Button>
-                                        )}
+                                            {selectedProperty && (
+                                                <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    type="button"
+                                                    className="h-auto p-0 text-xs text-blue-600"
+                                                    onClick={() => window.open(`/imoveis?q=${encodeURIComponent(selectedProperty.titulo)}`, '_blank')}
+                                                >
+                                                    Editar Imóvel
+                                                    <UploadCloud className="w-3 h-3 ml-1" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                     <Select value={propertyId} onValueChange={setPropertyId}>
                                         <SelectTrigger>
@@ -319,22 +351,34 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                 <div className="space-y-1.5">
                                     <div className="flex items-center justify-between">
                                         <Label>Inquilino</Label>
-                                        {clientId && (
+                                        <div className="flex gap-2 items-center">
                                             <Button
-                                                variant="link"
+                                                variant="ghost"
                                                 size="sm"
-                                                className="h-auto p-0 text-xs text-blue-600"
-                                                onClick={() => {
-                                                    const client = clients?.find(c => c.id === clientId);
-                                                    if (client) {
-                                                        window.open(`/clientes?q=${encodeURIComponent(client.nome)}`, '_blank');
-                                                    }
-                                                }}
+                                                type="button"
+                                                className="h-auto p-0 text-xs text-green-600 hover:text-green-700"
+                                                onClick={() => setIsNovoClienteOpen(true)}
                                             >
-                                                Editar Inquilino
-                                                <UploadCloud className="w-3 h-3 ml-1" />
+                                                <Plus className="w-3 h-3 mr-1" /> Novo Inquilino
                                             </Button>
-                                        )}
+                                            {clientId && (
+                                                <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    type="button"
+                                                    className="h-auto p-0 text-xs text-blue-600"
+                                                    onClick={() => {
+                                                        const client = clients?.find(c => c.id === clientId);
+                                                        if (client) {
+                                                            window.open(`/clientes?q=${encodeURIComponent(client.nome)}`, '_blank');
+                                                        }
+                                                    }}
+                                                >
+                                                    Editar Inquilino
+                                                    <UploadCloud className="w-3 h-3 ml-1" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                     <Select value={clientId} onValueChange={setClientId}>
                                         <SelectTrigger>
@@ -507,6 +551,16 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            {/* Quick Create Dialogs */}
+            <NovoImovelDialog
+                open={isNovoImovelOpen}
+                onOpenChange={handleNovoImovelClose}
+            />
+            <NovoClienteDialog
+                open={isNovoClienteOpen}
+                onOpenChange={handleNovoClienteClose}
+            />
         </Dialog>
     );
 }
