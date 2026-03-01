@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calculator, User as UserIcon, Building2, FileText, CalendarDays, ArrowUpRight, ArrowDownLeft, MoreHorizontal, Search, DollarSign } from "lucide-react";
+import { Calculator, User as UserIcon, Building2, FileText, CalendarDays, ArrowUpRight, ArrowDownLeft, MoreHorizontal, Search, DollarSign, PowerOff } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NewContractDialog } from "./NewContractDialog";
@@ -23,6 +23,7 @@ export function ContractsList() {
     const [isNewContractOpen, setIsNewContractOpen] = useState(false);
     const [selectedContract, setSelectedContract] = useState<any>(null);
     const [contractToTerminate, setContractToTerminate] = useState<any>(null);
+    const [contractToFinish, setContractToFinish] = useState<any>(null);
     const [simulatedRent, setSimulatedRent] = useState<number>(0);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -44,6 +45,26 @@ export function ContractsList() {
         } catch (error: any) {
             console.error("Erro ao excluir:", error);
             toast.error("Erro ao excluir contrato: " + error.message);
+        }
+    };
+
+    const handleFinishContract = async () => {
+        if (!contractToFinish) return;
+        try {
+            const { error } = await supabase
+                .from('contratos')
+                .update({ status: 'ENCERRADO' })
+                .eq('id', contractToFinish.id);
+
+            if (error) throw error;
+
+            toast.success("Contrato encerrado com sucesso.");
+            setContractToFinish(null);
+
+            window.location.reload();
+        } catch (error: any) {
+            console.error("Erro ao encerrar contrato:", error);
+            toast.error("Erro ao encerrar contrato: " + error.message);
         }
     };
 
@@ -243,6 +264,7 @@ export function ContractsList() {
                                                                 ${contract.status === 'ATIVO' ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20' : ''}
                                                                 ${contract.status === 'PENDENTE' ? 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : ''}
                                                                 ${contract.status === 'CANCELADO' ? 'border-red-500 text-red-600 bg-red-50 dark:bg-red-900/20' : ''}
+                                                                ${contract.status === 'ENCERRADO' ? 'border-slate-500 text-slate-600 bg-slate-50 dark:bg-slate-900/20' : ''}
                                                             `}
                                                         >
                                                             {contract.status}
@@ -312,6 +334,9 @@ export function ContractsList() {
                                                                     <FileText className="mr-2 h-4 w-4" /> Ver Contrato
                                                                 </DropdownMenuItem>
                                                             )}
+                                                            <DropdownMenuItem onClick={() => setContractToFinish(contract)}>
+                                                                <PowerOff className="mr-2 h-4 w-4" /> Encerrar Contrato
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                                                 onClick={() => setContractToTerminate(contract)}
@@ -418,6 +443,29 @@ export function ContractsList() {
                             className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                         >
                             Excluir Definitivamente
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Dialog for Ending Contract */}
+            <AlertDialog open={!!contractToFinish} onOpenChange={(open) => !open && setContractToFinish(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Encerrar Contrato?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta ação mudará o status do contrato para <strong>ENCERRADO</strong>, permitindo que você associe este imóvel a um novo inquilino. O histórico e faturas do contrato atual serão mantidos como registro.
+                            <br /><br />
+                            Contrato: <strong>{contractToFinish?.imoveis?.titulo}</strong>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleFinishContract}
+                            className="bg-primary hover:bg-primary/90 focus:ring-primary"
+                        >
+                            Confirmar Encerramento
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

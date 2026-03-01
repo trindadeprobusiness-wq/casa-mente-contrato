@@ -182,10 +182,19 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Fallback for when the table doesn't exist yet
+        if (error.code === '42P01') {
+          console.warn('Tabela alertas não encontrada, ignorando alertas por enquanto.');
+          set({ alertas: [] });
+          return;
+        }
+        throw error;
+      }
       set({ alertas: (data || []) as Alerta[] });
     } catch (error) {
       console.error('Erro ao buscar alertas:', error);
+      set({ alertas: [] }); // Ensure we don't crash
     }
   },
 

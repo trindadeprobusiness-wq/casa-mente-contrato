@@ -69,7 +69,7 @@ export function BillsList() {
             // If bill exists in DB, use its data. Otherwise, project a virtual bill.
             const status = existingBill ? existingBill.status : (isLate ? 'ATRASADO' : 'PENDENTE');
             const valor = existingBill ? existingBill.valor_total : contract.valor;
-            const boletoUrl = existingBill?.boleto_url || null;
+            const boletoUrl = existingBill ? (existingBill as any).boleto_url : null;
             const id = existingBill ? existingBill.id : `virtual_${contract.id}`;
 
             return {
@@ -126,9 +126,15 @@ export function BillsList() {
 
         const loadingToast = toast.loading("Processando pagamento...");
         try {
+            let faturaId = bill.id;
+            const taxaAdmPercentual = bill.contract.taxa_administracao_percentual || 10;
+            const valorBase = bill.contract.valor || bill.valor_total; // comissão incide sobre o valor do aluguel
+            const valorTaxaAdm = (valorBase * taxaAdmPercentual) / 100;
+            const valorLiquido = bill.valor_total - valorTaxaAdm;
+
             if (bill.isVirtual) {
                 // Fatura não existe no banco (virtual), vamos CRIAR e já marcar como PAGA.
-                const { error } = await supabase
+                const { data: newFatura, error } = await supabase
                     .from('faturas_aluguel')
                     .insert({
                         contrato_id: bill.contract.id,
@@ -141,8 +147,11 @@ export function BillsList() {
                         mes_referencia: referenceMonthStr,
                         data_pagamento: new Date().toISOString(),
                         valor_pago: bill.contract.valor
-                    });
+                    })
+                    .select()
+                    .single();
                 if (error) throw error;
+                faturaId = newFatura.id;
             } else {
                 // Fatura já existe no banco, apenas atualiza o status
                 const { error } = await supabase
@@ -155,6 +164,40 @@ export function BillsList() {
                     .eq('id', bill.id);
                 if (error) throw error;
             }
+
+            // 1. Lançamento Financeiro (Receita / Comissão Administrativa)
+            const { error: finError } = await supabase.from('lancamentos_financeiros').insert({
+                tipo: 'RECEITA',
+                categoria: 'COMISSAO_LOCACAO',
+                descricao: `Comissão Adm (${taxaAdmPercentual}%) - ${bill.contract.imoveis?.titulo || 'Imóvel'}`,
+                valor: valorTaxaAdm,
+                data: new Date().toISOString().split('T')[0],
+                corretor_id: bill.contract.corretor_id,
+                imovel_id: bill.contract.imovel_id,
+                contrato_id: bill.contract.id
+            });
+            if (finError) console.error("Erro ao gerar lançamento financeiro:", finError);
+
+            // 2. Repasse ao Proprietário
+            const diaRepasse = bill.contract.dia_repasse_proprietario || 15;
+            const dataRepasse = new Date(bill.dueDate);
+            dataRepasse.setDate(diaRepasse);
+            if (dataRepasse <= bill.dueDate) {
+                dataRepasse.setMonth(dataRepasse.getMonth() + 1);
+            }
+
+            const { error: repasseError } = await (supabase.from as any)('repasses_proprietario').insert({
+                fatura_origem_id: faturaId,
+                contrato_id: bill.contract.id,
+                corretor_id: bill.contract.corretor_id,
+                proprietario_nome: bill.contract.imoveis?.proprietario_nome || 'Não Informado',
+                data_prevista: dataRepasse.toISOString().split('T')[0],
+                valor_bruto_recebido: bill.valor_total,
+                valor_taxa_adm: valorTaxaAdm,
+                valor_liquido_repasse: valorLiquido,
+                status: 'AGENDADO'
+            });
+            if (repasseError) console.error("Erro ao gerar repasse:", repasseError);
 
             toast.dismiss(loadingToast);
             toast.success("Pagamento confirmado com sucesso!");

@@ -14,11 +14,11 @@ export function DataLoader({ children }: DataLoaderProps) {
     const loadData = async () => {
       try {
         await Promise.all([
-          fetchCorretor(),
-          fetchClientes(),
-          fetchImoveis(),
-          fetchContratos(),
-          fetchAlertas(),
+          fetchCorretor().catch(e => console.error("Corretor falhou:", e)),
+          fetchClientes().catch(e => console.error("Clientes falhou:", e)),
+          fetchImoveis().catch(e => console.error("Imoveis falhou:", e)),
+          fetchContratos().catch(e => console.error("Contratos falhou:", e)),
+          fetchAlertas().catch(e => console.error("Alertas falhou:", e)),
         ]);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);

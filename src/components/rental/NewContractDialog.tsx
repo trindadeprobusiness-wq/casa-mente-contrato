@@ -328,7 +328,9 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                     </div>
                                     <Select value={propertyId} onValueChange={setPropertyId}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Selecione o imóvel" />
+                                            <div className="truncate pr-4 w-full text-left">
+                                                <SelectValue placeholder="Selecione o imóvel" />
+                                            </div>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {properties?.map(p => (
@@ -382,7 +384,9 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                                     </div>
                                     <Select value={clientId} onValueChange={setClientId}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Selecione o cliente" />
+                                            <div className="truncate pr-4 w-full text-left">
+                                                <SelectValue placeholder="Selecione o cliente" />
+                                            </div>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {clients?.map(c => (
