@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCRMStore } from '@/stores/crmStore';
 import { TipoInteresse, StatusFunil, Cliente } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
+import { getTrackingData } from '@/hooks/useUTMTracker';
 
 interface NovoClienteDialogProps {
   open: boolean;
@@ -83,10 +84,12 @@ export function NovoClienteDialog({ open, onOpenChange, clienteToEdit }: NovoCli
         }
         toast({ title: 'Cliente atualizado com sucesso!' });
       } else {
+        const trackingData = getTrackingData();
         const newId = await addCliente({
           ...form,
           status_funil: 'QUALIFICACAO' as StatusFunil,
-          ultimo_contato: new Date().toISOString()
+          ultimo_contato: new Date().toISOString(),
+          tracking_data: trackingData || {}
         });
 
         if (newId && selectedImovel) {

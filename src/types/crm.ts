@@ -46,6 +46,7 @@ export interface Cliente {
   documentos: Documento[];
   imoveis_interesse: string[];
   created_at: string;
+  tracking_data?: Record<string, any>;
 }
 
 export interface Imovel {
@@ -67,6 +68,9 @@ export interface Imovel {
   clientes_interessados: string[];
   fotos?: string[];
   created_at: string;
+  status_venda?: 'DISPONIVEL' | 'VENDIDO' | 'ALUGADO';
+  tracking_data?: Record<string, any>;
+  anunciado?: boolean;
 }
 
 export interface Documento {

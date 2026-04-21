@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useCRMStore } from '@/stores/crmStore';
 import { Loader2 } from 'lucide-react';
+import { useUTMTracker } from '@/hooks/useUTMTracker';
 
 interface DataLoaderProps {
   children: React.ReactNode;
 }
 
 export function DataLoader({ children }: DataLoaderProps) {
+  useUTMTracker(); // intercepta as UTMs globais
   const [loading, setLoading] = useState(true);
   const { fetchClientes, fetchImoveis, fetchContratos, fetchCorretor, fetchAlertas } = useCRMStore();
 

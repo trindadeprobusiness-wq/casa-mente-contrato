@@ -9,8 +9,10 @@ import { useCRMStore } from '@/stores/crmStore';
 import { TipoImovel } from '@/types/crm';
 import { useToast } from '@/hooks/use-toast';
 import { useImovelFotos } from '@/hooks/useImovelFotos';
+import { MapPin, Home, DollarSign, Loader2 } from 'lucide-react';
 import { ImovelFotosUpload } from './ImovelFotosUpload';
 import { supabase } from '@/integrations/supabase/client';
+import { getTrackingData } from '@/hooks/useUTMTracker';
 
 interface NovoImovelDialogProps {
   open: boolean;
@@ -90,6 +92,7 @@ export function NovoImovelDialog({ open, onOpenChange, imovelToEdit }: NovoImove
         }
 
         // Create imovel in database
+        const trackingData = getTrackingData();
         const { data, error } = await supabase
           .from('imoveis')
           .insert({
@@ -104,6 +107,7 @@ export function NovoImovelDialog({ open, onOpenChange, imovelToEdit }: NovoImove
             cidade: form.cidade,
             proprietario_nome: form.proprietario_nome,
             corretor_id: corretorId,
+            tracking_data: trackingData || {},
           })
           .select()
           .single();

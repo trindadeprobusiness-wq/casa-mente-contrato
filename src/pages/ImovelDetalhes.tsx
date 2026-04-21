@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, MapPin, Ruler, Bed, Car, Calendar, User, Phone, Mail, Upload, Users, FileText } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, MapPin, Ruler, Bed, Car, Calendar, User, Phone, Mail, Upload, Users, FileText, Megaphone, Copy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRMStore } from '@/stores/crmStore';
@@ -25,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { VendaImovelDialog } from '@/components/imoveis/VendaImovelDialog';
 
 const tipoLabels: Record<TipoImovel, string> = {
   APARTAMENTO: 'Apartamento',
@@ -54,6 +58,8 @@ interface ImovelData {
   proprietario_email: string | null;
   created_at: string | null;
   ativo: boolean | null;
+  status_venda?: 'DISPONIVEL' | 'VENDIDO' | 'ALUGADO';
+  anunciado?: boolean;
 }
 
 interface ClienteInteressado {
@@ -73,7 +79,9 @@ export default function ImovelDetalhes() {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [vendaDialogOpen, setVendaDialogOpen] = useState(false);
   const [clientesInteressados, setClientesInteressados] = useState<ClienteInteressado[]>([]);
+  const [isCopied, setIsCopied] = useState(false);
 
   const { fotos, loading: loadingFotos, uploading, fetchFotos, uploadMultipleFotos, deleteFoto, setFotoPrincipal } = useImovelFotos(id);
 
@@ -166,6 +174,39 @@ export default function ImovelDetalhes() {
     }).format(valor);
   };
 
+  const handleToggleAnunciado = async (checked: boolean) => {
+    if (!imovel) return;
+    
+    // Atualiza o estado local imediatamente para melhor UX
+    setImovel({ ...imovel, anunciado: checked });
+    
+    const { error } = await supabase
+      .from('imoveis')
+      .update({ anunciado: checked } as any)
+      .eq('id', imovel.id);
+
+    if (error) {
+      // Reverte em caso de erro
+      setImovel({ ...imovel, anunciado: !checked });
+      toast({ variant: 'destructive', title: 'Erro ao atualizar status', description: error.message });
+      return;
+    }
+    
+    toast({ 
+      title: checked ? 'Imóvel Anunciado! 🚀' : 'Anúncio Pausado', 
+      description: checked ? 'O Webhook deste imóvel já está pronto para receber leads.' : 'O status do imóvel foi atualizado.' 
+    });
+  };
+
+  const copyWebhook = () => {
+    if (!imovel) return;
+    const url = `${import.meta.env.VITE_SUPABASE_URL || 'https://sua-url-supabase'}/functions/v1/lead-capture?imovel_id=${imovel.id}`;
+    navigator.clipboard.writeText(url);
+    setIsCopied(true);
+    toast({ title: 'Webhook Copiado!', description: 'Cole na configuração do Meta Ads, PerfectPay ou Landing Page.' });
+    setTimeout(() => setIsCopied(false), 3000);
+  };
+
   const isExclusividadeProxima = (date?: string | null) => {
     if (!date) return false;
     const diff = new Date(date).getTime() - new Date().getTime();
@@ -217,6 +258,11 @@ export default function ImovelDetalhes() {
           </div>
         </div>
         <div className="flex gap-2">
+          {imovel.status_venda !== 'VENDIDO' && (
+             <Button variant="default" className="bg-green-600 hover:bg-green-700" size="sm" onClick={() => setVendaDialogOpen(true)}>
+               Sinalizar Venda
+             </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setDeleteDialogOpen(true)}>
             <Trash2 className="w-4 h-4 mr-2" />
             Excluir
@@ -261,6 +307,49 @@ export default function ImovelDetalhes() {
             />
           )}
         </CardContent>
+      </Card>
+
+      {/* Setup de Campanhas / Webhook */}
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-primary" />
+              Tracking & Campanhas (Tráfego Pago)
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="anunciado-mode" className="text-sm text-muted-foreground whitespace-nowrap">
+                {imovel.anunciado ? 'Ativado (Em Campanha)' : 'Desativado'}
+              </Label>
+              <Switch 
+                id="anunciado-mode" 
+                checked={imovel.anunciado || false}
+                onCheckedChange={handleToggleAnunciado}
+                className="data-[state=checked]:bg-green-500"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        {imovel.anunciado && (
+          <CardContent className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="p-4 bg-background border rounded-md">
+              <p className="text-sm font-medium mb-2 text-foreground">Webhook Exclusivo (Recepção de Leads)</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Cole a URL abaixo nas integrações da sua Landing Page ou Meta Ads. Qualquer lead que enviar uma requisição POST pra ela cairá automático no CRM já linkado a este imóvel.
+              </p>
+              <div className="flex items-center gap-2 relative">
+                <Input 
+                  readOnly 
+                  className="font-mono text-xs text-muted-foreground pr-12 focus-visible:ring-0" 
+                  value={`${import.meta.env.VITE_SUPABASE_URL || 'https://sua-url'}/functions/v1/lead-capture?imovel_id=${imovel.id}`} 
+                />
+                <Button variant="secondary" size="icon" onClick={copyWebhook} className="absolute right-1 w-8 h-8">
+                  {isCopied ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-muted-foreground" />}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -438,6 +527,13 @@ export default function ImovelDetalhes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <VendaImovelDialog 
+        open={vendaDialogOpen} 
+        onOpenChange={setVendaDialogOpen} 
+        imovel={imovel} 
+        onSuccess={() => fetchImovel()}
+      />
     </div>
   );
 }

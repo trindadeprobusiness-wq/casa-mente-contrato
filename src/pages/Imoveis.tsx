@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Search, Bed, Car, Ruler, Image } from 'lucide-react';
+import { Plus, Search, Bed, Car, Ruler, Image, Megaphone } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ export default function Imoveis() {
   const { imoveis } = useCRMStore();
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
+  const [statusAnuncioFilter, setStatusAnuncioFilter] = useState<string>('TODOS');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [imovelToEdit, setImovelToEdit] = useState<any>(null);
   const [fotosPrincipais, setFotosPrincipais] = useState<Record<string, string>>({});
@@ -62,7 +63,11 @@ export default function Imoveis() {
 
     const matchesTipo = tipoFilter === 'TODOS' || imovel.tipo === tipoFilter;
 
-    return matchesSearch && matchesTipo;
+    const matchesAnuncio = statusAnuncioFilter === 'TODOS' || 
+                           (statusAnuncioFilter === 'ANUNCIADOS' && imovel.anunciado) ||
+                           (statusAnuncioFilter === 'NAO_ANUNCIADOS' && !imovel.anunciado);
+
+    return matchesSearch && matchesTipo && matchesAnuncio;
   });
 
   const formatPrice = (valor: number) => {
@@ -117,6 +122,16 @@ export default function Imoveis() {
                 {label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusAnuncioFilter} onValueChange={setStatusAnuncioFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Status Anúncio" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="TODOS">Todos (Ads)</SelectItem>
+            <SelectItem value="ANUNCIADOS">Em Campanha (Ativos)</SelectItem>
+            <SelectItem value="NAO_ANUNCIADOS">Não Anunciados</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -188,6 +203,11 @@ export default function Imoveis() {
                       >
                         Exclusiva
                         {isExclusividadeProxima(imovel.exclusividade_ate) && ' ⚠️'}
+                      </Badge>
+                    )}
+                    {imovel.anunciado && (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200 text-xs flex items-center gap-1">
+                        <Megaphone className="w-3 h-3" /> Ads
                       </Badge>
                     )}
                   </div>
