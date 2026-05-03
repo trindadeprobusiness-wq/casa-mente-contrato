@@ -1,9 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const sanitize = (text: unknown, max = 2000): string => {
+  if (typeof text !== "string") return "";
+  return text.replace(/[<>]/g, "").slice(0, max).trim();
+};
+
+const VALID_TIPOS = ["LOCACAO", "VENDA", "COMODATO", "PRESTACAO_SERVICO", "OUTRO"];
 
 interface ContratoRequest {
   tipo: string;
