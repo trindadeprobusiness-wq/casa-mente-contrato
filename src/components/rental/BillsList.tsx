@@ -43,7 +43,7 @@ export function BillsList() {
     const { data: monthlyBills, isLoading: loadingBills } = useQuery({
         queryKey: ["rental-bills-monthly", referenceMonthStr],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("faturas_aluguel")
                 .select('*')
                 .eq('mes_referencia', referenceMonthStr);
@@ -134,7 +134,7 @@ export function BillsList() {
 
             if (bill.isVirtual) {
                 // Fatura não existe no banco (virtual), vamos CRIAR e já marcar como PAGA.
-                const { data: newFatura, error } = await supabase
+                const { data: newFatura, error } = await (supabase as any)
                     .from('faturas_aluguel')
                     .insert({
                         contrato_id: bill.contract.id,
@@ -154,7 +154,7 @@ export function BillsList() {
                 faturaId = newFatura.id;
             } else {
                 // Fatura já existe no banco, apenas atualiza o status
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from("faturas_aluguel")
                     .update({
                         status: 'PAGO',

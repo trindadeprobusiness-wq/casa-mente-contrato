@@ -20,7 +20,7 @@ export function RepassesList() {
         queryKey: ["rental-payouts"],
         queryFn: async () => {
             // Fetch repasses with contract info
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("repasses_proprietario")
                 .select(`
                     *,
@@ -41,7 +41,7 @@ export function RepassesList() {
         if (!confirm("Confirmar que a transferência via PIX foi realizada para o proprietário?")) return;
 
         try {
-            const { error } = await supabase
+            const { error } = await (supabase as any)
                 .from("repasses_proprietario")
                 .update({
                     status: 'CONFIRMADO',

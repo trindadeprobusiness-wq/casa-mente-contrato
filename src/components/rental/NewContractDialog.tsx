@@ -173,7 +173,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
 
                 // Sync Pending Bills
                 try {
-                    const { data: bills } = await supabase
+                    const { data: bills } = await (supabase as any)
                         .from('faturas_aluguel')
                         .select('*')
                         .eq('contrato_id', contractToEdit.id)
@@ -185,7 +185,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                             // Set new day, keep month/year
                             const newDate = new Date(originalDate.getFullYear(), originalDate.getMonth(), parseInt(dueDay));
 
-                            return supabase
+                            return (supabase as any)
                                 .from('faturas_aluguel')
                                 .update({
                                     valor_total: rent, // Update value
@@ -229,7 +229,7 @@ export function NewContractDialog({ open, onOpenChange, contractToEdit }: NewCon
                     const correctStatus = dueDate < now ? 'ATRASADO' : 'PENDENTE';
                     const referenceMonthStr = format(dueDate, 'MM/yyyy');
 
-                    const { error: billError } = await supabase
+                    const { error: billError } = await (supabase as any)
                         .from('faturas_aluguel')
                         .insert({
                             contrato_id: result.id,
