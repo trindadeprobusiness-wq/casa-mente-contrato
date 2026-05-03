@@ -1,0 +1,145 @@
+{
+  "name": "D - qualificacao-gemini",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Quando chamado",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Mensagem do cliente: {{$json.text}}\nContexto atual da sessão: {{JSON.stringify($json.context_json || {})}}\nTelefone: {{$json.from}}",
+        "options": {
+          "systemMessage": "Você é um corretor virtual de imóveis. Sua missão é qualificar o lead em até 5 perguntas (slot filling): nome, tipo_interesse (COMPRA/ALUGUEL), faixa_valor_min/max, forma_pagamento (À_VISTA/FINANCIAMENTO/FGTS), tempo_decisao (IMEDIATO/3_MESES/6_MESES/SEM_PRESSA).\n\nRegras:\n1. Uma pergunta por vez, cordial, objetiva, em PT-BR.\n2. Quando tiver as informações suficientes, use a tool `salvar_lead` com a classificação: 'quente' (decisão imediata + valor compatível), 'morno' (3-6 meses), 'frio' (sem pressa), 'descartado' (sem interesse real).\n3. Use `buscar_imoveis` sempre que souber preferências mínimas (tipo+faixa_valor).\n4. Sempre use `anexar_historico` após enviar resposta ao cliente, registrando o texto que você enviou.\n5. Responda APENAS com a próxima mensagem a ser enviada ao cliente."
+        }
+      },
+      "id": "agent",
+      "name": "AI Agent (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [420, 400]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-pro-latest",
+        "options": { "temperature": 0.4 }
+      },
+      "id": "llm",
+      "name": "Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [380, 620]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{$json.from}}",
+        "contextWindowLength": 20
+      },
+      "id": "memory",
+      "name": "Memória por telefone",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [520, 620]
+    },
+    {
+      "parameters": {
+        "name": "buscar_imoveis",
+        "description": "Consulta imóveis disponíveis. Parâmetros: tipo (VENDA|ALUGUEL), categoria (APARTAMENTO|CASA), valor_min, valor_max, dormitorios, cidade.",
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_EDGE_URL }}/crm-buscar-imoveis",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "x-n8n-secret", "value": "={{ $vars.N8N_SHARED_SECRET }}" } ] },
+        "sendQuery": true
+      },
+      "id": "tool-buscar",
+      "name": "Tool: buscar_imoveis",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [680, 620]
+    },
+    {
+      "parameters": {
+        "name": "salvar_lead",
+        "description": "Faz upsert do lead no CRM. Campos: telefone (obrigatório), nome, email, tipo_interesse, faixa_valor_min, faixa_valor_max, forma_pagamento, tempo_decisao, imovel_interesse, classificacao (quente|morno|frio|descartado), observacoes.",
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_EDGE_URL }}/crm-upsert-lead",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "x-n8n-secret", "value": "={{ $vars.N8N_SHARED_SECRET }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json"
+      },
+      "id": "tool-upsert",
+      "name": "Tool: salvar_lead",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [820, 620]
+    },
+    {
+      "parameters": {
+        "name": "anexar_historico",
+        "description": "Grava uma mensagem no histórico_contatos do cliente. Campos: telefone, direcao (IN|OUT), mensagem, metadata opcional.",
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_EDGE_URL }}/crm-anexar-historico",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "x-n8n-secret", "value": "={{ $vars.N8N_SHARED_SECRET }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json"
+      },
+      "id": "tool-hist",
+      "name": "Tool: anexar_historico",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [960, 620]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$('Quando chamado').item.json.from}}\",\n  \"text\": \"{{ $json.output.replace(/\\\"/g,'\\\\\\\"') }}\"\n}"
+      },
+      "id": "send-reply",
+      "name": "Enviar resposta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{ $('Quando chamado').item.json.from }}" },
+          { "column": "state", "value": "IN_QUALIFICATION" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "touch-session",
+      "name": "Atualizar sessão",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Quando chamado": { "main": [ [ { "node": "AI Agent (Gemini)", "type": "main", "index": 0 } ] ] },
+    "Gemini Chat Model": { "ai_languageModel": [ [ { "node": "AI Agent (Gemini)", "type": "ai_languageModel", "index": 0 } ] ] },
+    "Memória por telefone": { "ai_memory": [ [ { "node": "AI Agent (Gemini)", "type": "ai_memory", "index": 0 } ] ] },
+    "Tool: buscar_imoveis": { "ai_tool": [ [ { "node": "AI Agent (Gemini)", "type": "ai_tool", "index": 0 } ] ] },
+    "Tool: salvar_lead": { "ai_tool": [ [ { "node": "AI Agent (Gemini)", "type": "ai_tool", "index": 0 } ] ] },
+    "Tool: anexar_historico": { "ai_tool": [ [ { "node": "AI Agent (Gemini)", "type": "ai_tool", "index": 0 } ] ] },
+    "AI Agent (Gemini)": { "main": [ [ { "node": "Enviar resposta WhatsApp", "type": "main", "index": 0 } ] ] },
+    "Enviar resposta WhatsApp": { "main": [ [ { "node": "Atualizar sessão", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

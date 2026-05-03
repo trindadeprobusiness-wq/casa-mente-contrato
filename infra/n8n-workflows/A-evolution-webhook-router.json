@@ -1,0 +1,132 @@
+{
+  "name": "A - evolution-webhook-router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evolution",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook Evolution",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "evolution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{$json.body.event}}", "rightValue": "messages.upsert", "operator": { "type": "string", "operation": "equals" } },
+            { "leftValue": "={{$json.body.data.key.fromMe}}", "rightValue": true, "operator": { "type": "boolean", "operation": "false" } },
+            { "leftValue": "={{$json.body.data.key.remoteJid}}", "rightValue": "@g.us", "operator": { "type": "string", "operation": "notContains" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-valid",
+      "name": "Apenas msgs válidas",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "from", "value": "={{$json.body.data.key.remoteJid.split('@')[0]}}", "type": "string" },
+            { "id": "2", "name": "text", "value": "={{$json.body.data.message?.conversation || $json.body.data.message?.extendedTextMessage?.text || ''}}", "type": "string" },
+            { "id": "3", "name": "instance", "value": "={{$json.body.instance}}", "type": "string" },
+            { "id": "4", "name": "messageId", "value": "={{$json.body.data.key.id}}", "type": "string" },
+            { "id": "5", "name": "timestamp", "value": "={{$json.body.data.messageTimestamp}}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "normalize",
+      "name": "Normalizar payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [640, 260]
+    },
+    {
+      "parameters": {
+        "operation": "getRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "filters": { "conditions": [ { "columnName": "phone", "condition": "equals", "value": "={{$json.from}}" } ] }
+      },
+      "id": "get-session",
+      "name": "Buscar sessão",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [860, 260]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true }, "conditions": [ { "leftValue": "={{$json.state || 'NEW'}}", "rightValue": "IN_MENU", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "IN_MENU" },
+            { "conditions": { "options": { "caseSensitive": true }, "conditions": [ { "leftValue": "={{$json.state || 'NEW'}}", "rightValue": "IN_QUALIFICATION", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "IN_QUALIFICATION" },
+            { "conditions": { "options": { "caseSensitive": true }, "conditions": [ { "leftValue": "={{$json.state || 'NEW'}}", "rightValue": "HANDOFF", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "HANDOFF" }
+          ]
+        },
+        "fallbackOutput": "NEW",
+        "options": {}
+      },
+      "id": "switch-state",
+      "name": "Switch por estado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1080, 260]
+    },
+    {
+      "parameters": { "workflowId": "={{ $vars.WF_MENU_INTELIGENTE }}", "options": {} },
+      "id": "call-menu",
+      "name": "→ B menu-inteligente",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1320, 160]
+    },
+    {
+      "parameters": { "workflowId": "={{ $vars.WF_MENU_HANDLER }}", "options": {} },
+      "id": "call-handler",
+      "name": "→ C menu-handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1320, 280]
+    },
+    {
+      "parameters": { "workflowId": "={{ $vars.WF_QUALIFICACAO }}", "options": {} },
+      "id": "call-qualif",
+      "name": "→ D qualificacao-gemini",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1320, 400]
+    },
+    {
+      "parameters": {},
+      "id": "noop-handoff",
+      "name": "HANDOFF (no-op)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1320, 520]
+    }
+  ],
+  "connections": {
+    "Webhook Evolution": { "main": [ [ { "node": "Apenas msgs válidas", "type": "main", "index": 0 } ] ] },
+    "Apenas msgs válidas": { "main": [ [ { "node": "Normalizar payload", "type": "main", "index": 0 } ], [] ] },
+    "Normalizar payload": { "main": [ [ { "node": "Buscar sessão", "type": "main", "index": 0 } ] ] },
+    "Buscar sessão": { "main": [ [ { "node": "Switch por estado", "type": "main", "index": 0 } ] ] },
+    "Switch por estado": {
+      "main": [
+        [ { "node": "→ B menu-inteligente", "type": "main", "index": 0 } ],
+        [ { "node": "→ C menu-handler", "type": "main", "index": 0 } ],
+        [ { "node": "→ D qualificacao-gemini", "type": "main", "index": 0 } ],
+        [ { "node": "HANDOFF (no-op)", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

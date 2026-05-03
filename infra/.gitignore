@@ -1,0 +1,4 @@
+# Nunca commitar segredos nem o clone da Evolution API
+.env
+.env.local
+evolution-api/

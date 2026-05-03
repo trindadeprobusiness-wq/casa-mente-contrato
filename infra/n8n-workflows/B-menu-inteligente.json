@@ -1,0 +1,114 @@
+{
+  "name": "B - menu-inteligente",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Quando chamado",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.text || '').toString();\nconst m = text.match(/ID[:\\s]?(\\d+)/i);\nconst urlMatch = text.match(/imovel\\/([a-z0-9-]+)/i);\nreturn [{ json: { ...$json, imovelDetectado: m?.[1] || urlMatch?.[1] || null } }];"
+      },
+      "id": "detect-context",
+      "name": "Detectar contexto (regex ID)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            { "leftValue": "={{$json.imovelDetectado}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }
+          ]
+        }
+      },
+      "id": "has-context",
+      "name": "Tem ID do imóvel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendList/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.from}}\",\n  \"title\": \"Olá! Sou o assistente da Imobiliária 🏠\",\n  \"description\": \"Como posso te ajudar hoje? Escolha uma opção abaixo.\",\n  \"buttonText\": \"Ver opções\",\n  \"footerText\": \"Atendimento 24/7 — respondemos em segundos\",\n  \"sections\": [\n    {\n      \"title\": \"Menu principal\",\n      \"rows\": [\n        { \"title\": \"1️⃣ Comprar imóvel\", \"rowId\": \"MENU_1_COMPRAR\", \"description\": \"Encontre apartamentos, casas e coberturas\" },\n        { \"title\": \"2️⃣ Alugar imóvel\", \"rowId\": \"MENU_2_ALUGAR\", \"description\": \"Locação residencial e comercial\" },\n        { \"title\": \"3️⃣ Sou proprietário\", \"rowId\": \"MENU_3_PROPRIETARIO\", \"description\": \"Cadastrar meu imóvel\" },\n        { \"title\": \"4️⃣ Falar com corretor\", \"rowId\": \"MENU_4_HUMANO\", \"description\": \"Atendimento humano\" },\n        { \"title\": \"5️⃣ Outras dúvidas\", \"rowId\": \"MENU_5_FAQ\", \"description\": \"Tirar uma dúvida geral\" }\n      ]\n    }\n  ]\n}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "send-menu",
+      "name": "Enviar menu (list)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 380]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{$json.from}}" },
+          { "column": "state", "value": "IN_MENU" },
+          { "column": "context_json", "value": "={{ JSON.stringify({}) }}" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "set-state-menu",
+      "name": "Estado → IN_MENU",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [1080, 380]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{$json.from}}" },
+          { "column": "state", "value": "IN_QUALIFICATION" },
+          { "column": "context_json", "value": "={{ JSON.stringify({ imovel_interesse: $json.imovelDetectado }) }}" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "jump-qualif",
+      "name": "Pular p/ qualificação",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [860, 200]
+    },
+    {
+      "parameters": { "workflowId": "={{ $vars.WF_QUALIFICACAO }}", "options": {} },
+      "id": "call-qualif",
+      "name": "→ D qualificacao-gemini",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1080, 200]
+    }
+  ],
+  "connections": {
+    "Quando chamado": { "main": [ [ { "node": "Detectar contexto (regex ID)", "type": "main", "index": 0 } ] ] },
+    "Detectar contexto (regex ID)": { "main": [ [ { "node": "Tem ID do imóvel?", "type": "main", "index": 0 } ] ] },
+    "Tem ID do imóvel?": {
+      "main": [
+        [ { "node": "Pular p/ qualificação", "type": "main", "index": 0 } ],
+        [ { "node": "Enviar menu (list)", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Pular p/ qualificação": { "main": [ [ { "node": "→ D qualificacao-gemini", "type": "main", "index": 0 } ] ] },
+    "Enviar menu (list)": { "main": [ [ { "node": "Estado → IN_MENU", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

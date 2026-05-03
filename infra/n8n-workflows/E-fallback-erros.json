@@ -1,0 +1,73 @@
+{
+  "name": "E - fallback-erros",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "workflow", "value": "={{$json.workflow.name}}", "type": "string" },
+            { "id": "2", "name": "node", "value": "={{$json.execution.lastNodeExecuted}}", "type": "string" },
+            { "id": "3", "name": "message", "value": "={{$json.execution.error.message}}", "type": "string" },
+            { "id": "4", "name": "stack", "value": "={{$json.execution.error.stack}}", "type": "string" },
+            { "id": "5", "name": "when", "value": "={{ $now.toISO() }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-context",
+      "name": "Contexto do erro",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insertRow",
+        "dataTableId": "={{ $vars.ERROR_LOG_TABLE_ID }}",
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "workflow", "value": "={{$json.workflow}}" },
+          { "column": "node", "value": "={{$json.node}}" },
+          { "column": "message", "value": "={{$json.message}}" },
+          { "column": "stack", "value": "={{$json.stack}}" },
+          { "column": "when", "value": "={{$json.when}}" }
+        ] }
+      },
+      "id": "log-error",
+      "name": "Gravar error_log",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $vars.ADMIN_PHONE }}\",\n  \"text\": \"🚨 *Erro n8n*\\nWorkflow: {{$json.workflow}}\\nNode: {{$json.node}}\\nMsg: {{$json.message}}\\nEm: {{$json.when}}\"\n}"
+      },
+      "id": "notify-admin",
+      "name": "Notificar admin WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Error Trigger": { "main": [ [ { "node": "Contexto do erro", "type": "main", "index": 0 } ] ] },
+    "Contexto do erro": { "main": [ [ { "node": "Gravar error_log", "type": "main", "index": 0 } ] ] },
+    "Gravar error_log": { "main": [ [ { "node": "Notificar admin WhatsApp", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,187 @@
+{
+  "name": "C - menu-handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Quando chamado",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.text || '').toString().trim();\n// Lista interativa devolve rowId; texto livre também é aceito (1, '1', 'comprar', etc)\nconst normalized = raw.toUpperCase();\nlet opt = null;\nif (normalized.startsWith('MENU_')) opt = normalized;\nelse if (/^1\\b|COMPRAR/.test(normalized)) opt = 'MENU_1_COMPRAR';\nelse if (/^2\\b|ALUGAR/.test(normalized)) opt = 'MENU_2_ALUGAR';\nelse if (/^3\\b|PROPRIET/.test(normalized)) opt = 'MENU_3_PROPRIETARIO';\nelse if (/^4\\b|HUMANO|CORRETOR/.test(normalized)) opt = 'MENU_4_HUMANO';\nelse if (/^5\\b|DUVIDA|FAQ/.test(normalized)) opt = 'MENU_5_FAQ';\nreturn [{ json: { ...$json, opcao: opt } }];"
+      },
+      "id": "parse-option",
+      "name": "Parsear opção",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": {}, "conditions": [ { "leftValue": "={{$json.opcao}}", "rightValue": "MENU_1_COMPRAR", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "COMPRAR" },
+          { "conditions": { "options": {}, "conditions": [ { "leftValue": "={{$json.opcao}}", "rightValue": "MENU_2_ALUGAR", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "ALUGAR" },
+          { "conditions": { "options": {}, "conditions": [ { "leftValue": "={{$json.opcao}}", "rightValue": "MENU_3_PROPRIETARIO", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "PROPRIETARIO" },
+          { "conditions": { "options": {}, "conditions": [ { "leftValue": "={{$json.opcao}}", "rightValue": "MENU_4_HUMANO", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "HUMANO" },
+          { "conditions": { "options": {}, "conditions": [ { "leftValue": "={{$json.opcao}}", "rightValue": "MENU_5_FAQ", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "FAQ" }
+        ] },
+        "fallbackOutput": "INVALID",
+        "options": {}
+      },
+      "id": "switch-opt",
+      "name": "Switch opção",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{$json.from}}" },
+          { "column": "state", "value": "IN_QUALIFICATION" },
+          { "column": "context_json", "value": "={{ JSON.stringify({ tipo_interesse: 'COMPRA' }) }}" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "state-comprar",
+      "name": "→ Qualificar (COMPRA)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{$json.from}}" },
+          { "column": "state", "value": "IN_QUALIFICATION" },
+          { "column": "context_json", "value": "={{ JSON.stringify({ tipo_interesse: 'ALUGUEL' }) }}" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "state-alugar",
+      "name": "→ Qualificar (ALUGUEL)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [880, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.from}}\",\n  \"text\": \"Que ótimo! Para cadastrar seu imóvel, um corretor vai te ligar em instantes. Pode me adiantar *endereço* e *tipo* do imóvel?\"\n}"
+      },
+      "id": "msg-prop",
+      "name": "Proprietário (stub)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.from}}\",\n  \"text\": \"Perfeito! Já chamei um corretor humano. Em breve você receberá uma mensagem direta. 🤝\"\n}"
+      },
+      "id": "msg-humano",
+      "name": "Handoff humano",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 460]
+    },
+    {
+      "parameters": {
+        "operation": "upsertRow",
+        "dataTableId": "={{ $vars.WHATSAPP_SESSIONS_TABLE_ID }}",
+        "matchColumns": ["phone"],
+        "dataToSend": "defineBelow",
+        "valuesToSend": { "values": [
+          { "column": "phone", "value": "={{$json.from}}" },
+          { "column": "state", "value": "HANDOFF" },
+          { "column": "last_interaction", "value": "={{ $now.toISO() }}" }
+        ] }
+      },
+      "id": "state-handoff",
+      "name": "Estado → HANDOFF",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [1100, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.from}}\",\n  \"text\": \"Claro! Me conta sua dúvida em poucas palavras que eu te respondo na sequência. 💬\"\n}"
+      },
+      "id": "msg-faq",
+      "name": "FAQ prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 580]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.EVOLUTION_BASE_URL }}/message/sendText/{{ $vars.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "={{ $vars.EVOLUTION_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.from}}\",\n  \"text\": \"Não entendi 🤔 Responda com o número da opção: 1, 2, 3, 4 ou 5.\"\n}"
+      },
+      "id": "msg-invalid",
+      "name": "Resposta inválida",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 700]
+    },
+    {
+      "parameters": { "workflowId": "={{ $vars.WF_QUALIFICACAO }}", "options": {} },
+      "id": "call-qualif",
+      "name": "→ D qualificacao-gemini",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1100, 160]
+    }
+  ],
+  "connections": {
+    "Quando chamado": { "main": [ [ { "node": "Parsear opção", "type": "main", "index": 0 } ] ] },
+    "Parsear opção": { "main": [ [ { "node": "Switch opção", "type": "main", "index": 0 } ] ] },
+    "Switch opção": {
+      "main": [
+        [ { "node": "→ Qualificar (COMPRA)", "type": "main", "index": 0 } ],
+        [ { "node": "→ Qualificar (ALUGUEL)", "type": "main", "index": 0 } ],
+        [ { "node": "Proprietário (stub)", "type": "main", "index": 0 } ],
+        [ { "node": "Handoff humano", "type": "main", "index": 0 } ],
+        [ { "node": "FAQ prompt", "type": "main", "index": 0 } ],
+        [ { "node": "Resposta inválida", "type": "main", "index": 0 } ]
+      ]
+    },
+    "→ Qualificar (COMPRA)": { "main": [ [ { "node": "→ D qualificacao-gemini", "type": "main", "index": 0 } ] ] },
+    "→ Qualificar (ALUGUEL)": { "main": [ [ { "node": "→ D qualificacao-gemini", "type": "main", "index": 0 } ] ] },
+    "Handoff humano": { "main": [ [ { "node": "Estado → HANDOFF", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
