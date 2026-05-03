@@ -226,9 +226,9 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       const { data, error } = await supabase
         .from('clientes')
         .insert({
-          ...cliente,
+          ...(cliente as any),
           corretor_id: corretorData,
-        })
+        } as any)
         .select()
         .single();
 
@@ -246,7 +246,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
     try {
       const { error } = await supabase
         .from('clientes')
-        .update(data)
+        .update(data as any)
         .eq('id', id);
 
       if (error) throw error;

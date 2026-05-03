@@ -92,7 +92,6 @@ export function NovoImovelDialog({ open, onOpenChange, imovelToEdit }: NovoImove
         }
 
         // Create imovel in database
-        const trackingData = getTrackingData();
         const { data, error } = await supabase
           .from('imoveis')
           .insert({
@@ -107,7 +106,6 @@ export function NovoImovelDialog({ open, onOpenChange, imovelToEdit }: NovoImove
             cidade: form.cidade,
             proprietario_nome: form.proprietario_nome,
             corretor_id: corretorId,
-            tracking_data: trackingData || {},
           })
           .select()
           .single();

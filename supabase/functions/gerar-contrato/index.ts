@@ -1,9 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const sanitize = (text: unknown, max = 2000): string => {
+  if (typeof text !== "string") return "";
+  return text.replace(/[<>]/g, "").slice(0, max).trim();
+};
+
+const VALID_TIPOS = ["LOCACAO", "VENDA", "COMODATO", "PRESTACAO_SERVICO", "OUTRO"];
 
 interface ContratoRequest {
   tipo: string;
@@ -61,23 +69,72 @@ serve(async (req) => {
   }
 
   try {
+    // Explicit auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid session" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const body: ContratoRequest = await req.json();
-    console.log("Received contract generation request:", JSON.stringify(body, null, 2));
 
     const { tipo, cliente, imovel, proprietario, corretor, detalhes } = body;
 
-    // Validate required fields
-    if (!tipo || !cliente?.nome || !imovel?.endereco) {
+    // Validate required fields and types
+    if (!tipo || typeof tipo !== "string" || tipo.length > 100) {
       return new Response(
-        JSON.stringify({ error: "Campos obrigatórios faltando: tipo, cliente.nome, imovel.endereco" }),
+        JSON.stringify({ error: "tipo de contrato inválido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    if (!cliente?.nome || typeof cliente.nome !== "string" || cliente.nome.length > 200) {
+      return new Response(
+        JSON.stringify({ error: "Nome do cliente inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!imovel?.endereco || typeof imovel.endereco !== "string" || imovel.endereco.length > 500) {
+      return new Response(
+        JSON.stringify({ error: "Endereço do imóvel inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (typeof detalhes?.valor !== "number" || detalhes.valor < 0 || detalhes.valor > 1_000_000_000) {
+      return new Response(
+        JSON.stringify({ error: "Valor inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sanitize free-text fields to mitigate prompt injection
+    cliente.nome = sanitize(cliente.nome, 200);
+    imovel.endereco = sanitize(imovel.endereco, 500);
+    if (detalhes.clausulas_adicionais) {
+      detalhes.clausulas_adicionais = sanitize(detalhes.clausulas_adicionais, 3000);
+    }
+    if (cliente.profissao) cliente.profissao = sanitize(cliente.profissao, 100);
+    if (cliente.estado_civil) cliente.estado_civil = sanitize(cliente.estado_civil, 50);
+    if (proprietario?.nome) proprietario.nome = sanitize(proprietario.nome, 200);
+
 
     const dataAtual = new Date().toLocaleDateString("pt-BR", {
       day: "numeric",
