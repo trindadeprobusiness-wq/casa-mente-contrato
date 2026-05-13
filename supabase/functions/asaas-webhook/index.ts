@@ -14,10 +14,15 @@ serve(async (req) => {
 
     try {
         // 1. Validate Token (Immediate 401 if invalid)
-        // NOTE: In production, use Deno.env.get('ASAAS_WEBHOOK_TOKEN')
-        // For now, hardcoding the one provided by user for testing simplicity or checking header.
         const requestToken = req.headers.get('x-hook-token');
-        const secretToken = "X-Hook-Token-SECRET-COLOQUE_AQUI_ALGO_COMPLEXO"; // Value from user prompt
+        const secretToken = Deno.env.get('ASAAS_WEBHOOK_TOKEN');
+        if (!secretToken) {
+            console.error("ASAAS_WEBHOOK_TOKEN não configurado nas variáveis de ambiente");
+            return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
 
         if (requestToken !== secretToken) {
             console.error("Invalid Webhook Token");

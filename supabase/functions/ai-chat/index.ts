@@ -13,10 +13,9 @@ serve(async (req) => {
 
     try {
         const { message, attachmentUrl, attachmentType } = await req.json()
-        const apiKey = Deno.env.get('GEMINI_API_KEY') || 'AIzaSyC_bk4eWjrwb2YtKa7hW_QuxRmHRPeU1kw' // Fallback to provided key if env not set
-
+        const apiKey = Deno.env.get('GEMINI_API_KEY')
         if (!apiKey) {
-            throw new Error('Gemini API Key not configured')
+            throw new Error('GEMINI_API_KEY não configurada nas variáveis de ambiente do Supabase')
         }
 
         const genAI = new GoogleGenerativeAI(apiKey)

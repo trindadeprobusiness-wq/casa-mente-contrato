@@ -51,8 +51,17 @@ serve(async (req) => {
     } = payload;
 
     const clienteNome = nome || (first_name ? `${first_name} ${last_name || ''}`.trim() : 'Lead de Campanha');
-    const clienteTelefone = telefone || celular || phone || '(00) 00000-0000';
+    const clienteTelefoneRaw = telefone || celular || phone || '(00) 00000-0000';
+    const clienteTelefone = clienteTelefoneRaw.replace(/\D/g, '') ? clienteTelefoneRaw : '(00) 00000-0000';
     const clienteEmail = email;
+
+    // Validação mínima
+    if (!clienteNome || clienteNome.length < 2) {
+        return new Response(
+            JSON.stringify({ success: false, error: 'Nome é obrigatório (mínimo 2 caracteres)' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+    }
 
     const tracking_data = {
       utm_source,
@@ -124,6 +133,21 @@ serve(async (req) => {
              console.error("Erro ao vincular ao imóvel:", vinculoError);
              // Não cancelamos a operação principal pois o lead já foi salvo
         }
+    }
+
+    // 4. Criar alerta automático para o corretor
+    try {
+        await supabaseClient.from('alertas').insert({
+            cliente_id: novoCliente.id,
+            corretor_id: corretor_id,
+            tipo: 'LEAD_QUENTE',
+            mensagem: `Novo lead do site: ${clienteNome} (${clienteTelefone}) — ${utm_campaign || 'direto'}`,
+            lido: false,
+            prioridade: 'ALTA'
+        });
+    } catch (alertError) {
+        console.error('Erro ao criar alerta:', alertError);
+        // Não falhar a operação principal por causa do alerta
     }
 
     return new Response(
