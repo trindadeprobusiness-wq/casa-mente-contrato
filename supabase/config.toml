@@ -2,3 +2,12 @@ project_id = "dqlolypbmsjgqrvdesev"
 
 [functions.generate-whatsapp-message]
 verify_jwt = false
+
+[functions.public-imoveis]
+verify_jwt = false
+
+[functions.imovel-detalhe]
+verify_jwt = false
+
+[functions.lead-capture]
+verify_jwt = false

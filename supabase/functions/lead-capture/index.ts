@@ -1,17 +1,33 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+/**
+ * Edge Function: lead-capture (captar-lead)
+ * 
+ * Recebe POST com dados do lead vindo da landing page ou campanhas.
+ * - Verifica duplicata por telefone (atualiza ultimo_contato se já existe)
+ * - Se novo, insere na tabela "clientes" com status_funil = QUALIFICACAO
+ * - Cria alerta LEAD_QUENTE para o corretor
+ * - Se imovel_interesse_id fornecido, vincula na tabela cliente_imovel
+ * 
+ * Payload:
+ * {
+ *   nome: string (obrigatório),
+ *   telefone: string (obrigatório),
+ *   email?: string,
+ *   mensagem?: string,
+ *   imovel_interesse_id?: string (uuid),
+ *   origem?: string,
+ *   tracking_data?: { interesse, faixa_preco, bairro_interesse, utm_source, utm_medium, utm_campaign, ... }
+ * }
+ */
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -19,144 +35,219 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' // Service role to bypass RLS for public webhooks
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Parse URL to see if imovel_id is passed as query parameter
-    const url = new URL(req.url);
-    const imovel_id = url.searchParams.get('imovel_id');
+    // Parse URL for optional query params
+    const url = new URL(req.url)
+    const imovel_id_query = url.searchParams.get('imovel_id')
 
-    // Also support JSON body
-    let payload;
+    // Parse body
+    let payload: any = {}
     try {
-      payload = await req.json();
-    } catch (e) {
-      payload = {};
+      payload = await req.json()
+    } catch (_e) {
+      payload = {}
     }
 
     const {
-      nome, 
-      email, 
-      telefone, 
+      nome,
+      email,
+      telefone,
       celular,
       phone,
       first_name,
       last_name,
-      utm_source, 
-      utm_campaign, 
-      utm_medium, 
-      fbclid,
-      // Suporte a diferentes formatos genéricos de plataformas (Typeform, Meta, etc)
-      ...otherData
-    } = payload;
-
-    const clienteNome = nome || (first_name ? `${first_name} ${last_name || ''}`.trim() : 'Lead de Campanha');
-    const clienteTelefoneRaw = telefone || celular || phone || '(00) 00000-0000';
-    const clienteTelefone = clienteTelefoneRaw.replace(/\D/g, '') ? clienteTelefoneRaw : '(00) 00000-0000';
-    const clienteEmail = email;
-
-    // Validação mínima
-    if (!clienteNome || clienteNome.length < 2) {
-        return new Response(
-            JSON.stringify({ success: false, error: 'Nome é obrigatório (mínimo 2 caracteres)' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-    }
-
-    const tracking_data = {
+      mensagem,
+      imovel_interesse_id,
+      origem,
+      tracking_data: incomingTracking,
+      // Legacy fields for backward compat
       utm_source,
       utm_campaign,
       utm_medium,
       fbclid,
-      captura_origem: 'webhook_inbound',
-      payload_raw: otherData
-    };
+      gclid,
+      assunto,
+      ...otherData
+    } = payload
 
-    // 1. Encontrar o ID do corretor padrão (ou o corretor dono do imóvel)
-    let corretor_id;
-    if (imovel_id) {
-        const { data: imovelData } = await supabaseClient
-            .from('imoveis')
-            .select('corretor_id')
-            .eq('id', imovel_id)
-            .single();
-        if (imovelData) {
-            corretor_id = imovelData.corretor_id;
-        }
-    }
-    
-    // Fallback: get the latest corretor from corretores table
-    if (!corretor_id) {
-         const { data: corretorData } = await supabaseClient
-            .from('corretores')
-            .select('id')
-            .limit(1)
-            .single();
-         corretor_id = corretorData?.id;
-    }
+    // --- Normalizar dados ---
+    const clienteNome = nome || (first_name ? `${first_name} ${last_name || ''}`.trim() : 'Lead de Campanha')
+    const clienteEmail = email || undefined
 
-    if (!corretor_id) {
-        throw new Error("Não foi possível encontrar um ID de corretor para atribuir.");
+    // Normalizar telefone: aceitar vários formatos, converter para 55+DDD+número
+    const rawPhone = telefone || celular || phone || ''
+    const digitsOnly = rawPhone.replace(/\D/g, '')
+    let clienteTelefone = rawPhone
+
+    if (digitsOnly.length >= 10) {
+      if (digitsOnly.length === 11) {
+        // DDD + 9 dígitos: 62999998888
+        clienteTelefone = `55${digitsOnly}`
+      } else if (digitsOnly.length === 10) {
+        // DDD + 8 dígitos (fixo): 6232228888
+        clienteTelefone = `55${digitsOnly}`
+      } else if (digitsOnly.length === 13 && digitsOnly.startsWith('55')) {
+        // Já no formato correto
+        clienteTelefone = digitsOnly
+      } else {
+        clienteTelefone = digitsOnly
+      }
     }
 
-    // 2. Inserir Cliente
-    const { data: novoCliente, error: clienteError } = await supabaseClient
-      .from('clientes')
-      .insert({
-        nome: clienteNome,
-        telefone: clienteTelefone,
-        email: clienteEmail,
-        tipo_interesse: 'AMBOS',
-        status_funil: 'QUALIFICACAO',
-        corretor_id: corretor_id,
-        tracking_data: tracking_data,
-        ultimo_contato: new Date().toISOString()
-      })
-      .select()
-      .single()
+    // Validações
+    if (!clienteNome || clienteNome.length < 2) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Nome é obrigatório (mínimo 2 caracteres)' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
 
-    if (clienteError) throw clienteError;
+    if (!clienteTelefone || clienteTelefone.replace(/\D/g, '').length < 10) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Telefone é obrigatório (mínimo 10 dígitos)' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
 
-    // 3. Vincular ao Imovel (se houver)
-    const target_imovel_id = imovel_id || payload.imovel_id;
-    
+    // Montar tracking_data completo
+    const trackingData = {
+      ...(incomingTracking || {}),
+      utm_source: incomingTracking?.utm_source || utm_source || undefined,
+      utm_campaign: incomingTracking?.utm_campaign || utm_campaign || undefined,
+      utm_medium: incomingTracking?.utm_medium || utm_medium || undefined,
+      fbclid: incomingTracking?.fbclid || fbclid || undefined,
+      gclid: incomingTracking?.gclid || gclid || undefined,
+      origem: origem || 'landing_page',
+      assunto: assunto || undefined,
+      mensagem: mensagem || undefined,
+      captured_at: new Date().toISOString(),
+      payload_extra: Object.keys(otherData).length > 0 ? otherData : undefined,
+    }
+
+    // --- Encontrar corretor ---
+    const target_imovel_id = imovel_id_query || imovel_interesse_id || payload.imovel_id
+    let corretor_id: string | undefined
+
     if (target_imovel_id) {
-        // Inserir na tabela de muitos-para-muitos
-        const { error: vinculoError } = await supabaseClient
-            .from('cliente_imovel')
-            .insert({
-                cliente_id: novoCliente.id,
-                imovel_id: target_imovel_id
-            });
-            
-        if (vinculoError) {
-             console.error("Erro ao vincular ao imóvel:", vinculoError);
-             // Não cancelamos a operação principal pois o lead já foi salvo
-        }
+      const { data: imovelData } = await supabaseClient
+        .from('imoveis')
+        .select('corretor_id')
+        .eq('id', target_imovel_id)
+        .single()
+      if (imovelData) corretor_id = imovelData.corretor_id
     }
 
-    // 4. Criar alerta automático para o corretor
+    if (!corretor_id) {
+      const { data: corretorData } = await supabaseClient
+        .from('corretores')
+        .select('id')
+        .limit(1)
+        .single()
+      corretor_id = corretorData?.id
+    }
+
+    if (!corretor_id) {
+      throw new Error('Não foi possível encontrar um corretor para atribuir.')
+    }
+
+    // --- Verificar duplicata por telefone ---
+    const phoneLookup = clienteTelefone.replace(/\D/g, '')
+    const { data: existingCliente } = await supabaseClient
+      .from('clientes')
+      .select('id, nome, tracking_data')
+      .eq('corretor_id', corretor_id)
+      .ilike('telefone', `%${phoneLookup.slice(-8)}%`) // Busca pelos últimos 8 dígitos
+      .limit(1)
+      .maybeSingle()
+
+    let clienteId: string
+    let isNew = false
+
+    if (existingCliente) {
+      // Atualizar cliente existente
+      const mergedTracking = {
+        ...(existingCliente.tracking_data || {}),
+        ultimo_retorno: trackingData,
+      }
+
+      const { error: updateError } = await supabaseClient
+        .from('clientes')
+        .update({
+          ultimo_contato: new Date().toISOString(),
+          tracking_data: mergedTracking,
+          ...(clienteEmail ? { email: clienteEmail } : {}),
+        })
+        .eq('id', existingCliente.id)
+
+      if (updateError) throw updateError
+      clienteId = existingCliente.id
+    } else {
+      // Criar novo cliente
+      isNew = true
+      const { data: novoCliente, error: clienteError } = await supabaseClient
+        .from('clientes')
+        .insert({
+          nome: clienteNome,
+          telefone: clienteTelefone,
+          email: clienteEmail,
+          tipo_interesse: 'AMBOS',
+          status_funil: 'QUALIFICACAO',
+          corretor_id,
+          tracking_data: trackingData,
+          ultimo_contato: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (clienteError) throw clienteError
+      clienteId = novoCliente.id
+    }
+
+    // --- Vincular imóvel (se fornecido) ---
+    if (target_imovel_id) {
+      await supabaseClient
+        .from('cliente_imovel')
+        .upsert(
+          { cliente_id: clienteId, imovel_id: target_imovel_id },
+          { onConflict: 'cliente_id,imovel_id' }
+        )
+        .select()
+    }
+
+    // --- Criar alerta ---
     try {
-        await supabaseClient.from('alertas').insert({
-            cliente_id: novoCliente.id,
-            corretor_id: corretor_id,
-            tipo: 'LEAD_QUENTE',
-            mensagem: `Novo lead do site: ${clienteNome} (${clienteTelefone}) — ${utm_campaign || 'direto'}`,
-            lido: false,
-            prioridade: 'ALTA'
-        });
+      const tipoLabel = isNew ? 'NOVO lead' : 'Retorno de lead'
+      await supabaseClient.from('alertas').insert({
+        cliente_id: clienteId,
+        corretor_id,
+        tipo: 'GERAL', // Usando tipo existente no enum
+        mensagem: `${tipoLabel} do site: ${clienteNome} (${clienteTelefone}) — ${origem || assunto || 'direto'}`,
+        lido: false,
+        metadata: {
+          lead_type: isNew ? 'new' : 'returning',
+          source: origem || 'landing_page',
+          tracking: trackingData,
+        },
+      })
     } catch (alertError) {
-        console.error('Erro ao criar alerta:', alertError);
-        // Não falhar a operação principal por causa do alerta
+      console.error('Erro ao criar alerta:', alertError)
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Lead capturado com sucesso!', cliente_id: novoCliente.id }),
+      JSON.stringify({
+        success: true,
+        message: isNew ? 'Lead capturado com sucesso!' : 'Lead atualizado com sucesso!',
+        cliente_id: clienteId,
+        is_new: isNew,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
