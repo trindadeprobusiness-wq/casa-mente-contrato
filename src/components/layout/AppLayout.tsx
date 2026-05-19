@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
-import { AIChatSupport } from '../ai/AIChatSupport';
+import { AIChatWidget } from '../ai/AIChatWidget';
 
 export function AppLayout() {
   return (
@@ -11,7 +11,7 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
-      <AIChatSupport />
+      <AIChatWidget />
     </div>
   );
 }
