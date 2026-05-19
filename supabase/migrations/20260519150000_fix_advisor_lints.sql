@@ -12,3 +12,4 @@ ALTER TABLE public.cliente_imovel ENABLE ROW LEVEL SECURITY;
 -- Setting `security_invoker = true` makes the view run with the privileges of the querying user,
 -- ensuring that RLS policies are properly enforced.
 ALTER VIEW public.v_leads_whatsapp SET (security_invoker = true);
+ 
