@@ -1,73 +1,62 @@
-# Welcome to your Lovable project
+# Oliver CRM — Negócios Inteligentes
 
-## Project info
+CRM imobiliário inteligente para corretores de imóveis, com geração de contratos e mensagens de WhatsApp assistidas por IA.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tecnologias
 
-## How can I edit this code?
+- **Vite** + **React 18** + **TypeScript**
+- **shadcn/ui** + **Tailwind CSS**
+- **Supabase** (banco de dados, autenticação e Edge Functions)
+- **Hospedagem:** Vercel
 
-There are several ways of editing your application.
+## Desenvolvimento local
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Pré-requisito: Node.js & npm instalados ([instalar com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)).
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 1. Clone o repositório
+git clone <SEU_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 2. Entre no diretório
+cd casa-mente-contrato-1
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Instale as dependências
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Inicie o servidor de desenvolvimento (http://localhost:8080)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Variáveis de ambiente
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Copie `.env.example` para `.env` e preencha as chaves do Supabase. Os segredos das Edge Functions
+(ex.: chaves de IA) são configurados no painel do Supabase, não no `.env` do frontend.
 
-**Use GitHub Codespaces**
+## Deploy na Vercel
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+O projeto já está configurado para a Vercel via [`vercel.json`](./vercel.json) — framework `vite`,
+build `npm run build`, saída `dist`, com rewrite de SPA para o React Router.
 
-## What technologies are used for this project?
+**Opção A — Git (recomendado):** conecte o repositório na Vercel. Cada push para a branch principal
+gera um deploy de produção e cada PR gera uma preview automática.
 
-This project is built with:
+**Opção B — CLI:**
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+npm i -g vercel      # instala a CLI (uma vez)
+vercel               # deploy de preview
+vercel --prod        # deploy de produção
+```
 
-## How can I deploy this project?
+Lembre-se de cadastrar as variáveis de ambiente do frontend no painel da Vercel
+(Project → Settings → Environment Variables).
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Domínio personalizado
 
-## Can I connect a custom domain to my Lovable project?
+Na Vercel: Project → Settings → Domains → **Add Domain**.
 
-Yes, you can!
+## Estrutura
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `src/` — código do frontend (React)
+- `supabase/` — migrações e Edge Functions (`gerar-contrato`, `generate-whatsapp-message`, etc.)
+- `vercel.json` — configuração de build e hospedagem
