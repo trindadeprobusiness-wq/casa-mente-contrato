@@ -15,33 +15,12 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        // Code-splitting: separa as libs pesadas em chunks próprios para
-        // que o carregamento inicial seja menor e melhor cacheado.
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (id.includes("recharts") || id.includes("/d3-")) return "charts";
-          if (
-            id.includes("jszip") ||
-            id.includes("pdf-lib") ||
-            id.includes("docx") ||
-            id.includes("file-saver")
-          ) {
-            return "documents";
-          }
-          if (
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("/react/") ||
-            id.includes("framer-motion")
-          ) {
-            return "react-vendor";
-          }
-          return "vendor";
-        },
-      },
-    },
+    // NÃO reintroduzir manualChunks aqui. O agrupamento manual quebrou a ordem
+    // de inicialização entre chunks em produção, causando
+    //   "Uncaught ReferenceError: Cannot access 'X' before initialization"
+    // → tela branca. A divisão padrão do Vite/Rollup é ordenada corretamente.
+    // Para reduzir o bundle no futuro, use React.lazy() por rota (code-splitting
+    // baseado em import dinâmico), que não tem esse problema de ordem.
+    chunkSizeWarningLimit: 1500,
   },
 }));
