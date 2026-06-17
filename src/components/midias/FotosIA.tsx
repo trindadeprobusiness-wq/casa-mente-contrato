@@ -478,9 +478,10 @@ export function FotosIA() {
                 }
 
                 setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'done', processedUrl } : i));
-            } catch (err: any) {
-                setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'error', error: err.message } : i));
-                toast.error(`Erro em ${img.originalFile.name}: ${err.message}`);
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+                setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'error', error: msg } : i));
+                toast.error(`Erro em ${img.originalFile.name}: ${msg}`);
             }
         }
 
@@ -498,8 +499,9 @@ export function FotosIA() {
                 processedUrl = await applyWatermark(processedUrl, watermark.logoUrl, watermark.position, watermark.opacity);
             }
             setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'done', processedUrl } : i));
-        } catch (err: any) {
-            setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'error', error: err.message } : i));
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+            setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'error', error: msg } : i));
         }
     };
 
