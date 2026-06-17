@@ -8,35 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // ───────────────────────────────────────────────
 // Constants & Types
 // ───────────────────────────────────────────────
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-// Prompt: Gemini analyzes the image and returns JSON enhancement parameters
-const AI_ANALYSIS_PROMPT = `You are a professional real estate photo editor AI. Analyze this property photo and return ONLY a JSON object (no markdown, no explanation) with optimal enhancement parameters to make it look like a professional real estate listing photo for Facebook Ads.
-
-The JSON must have exactly these keys with numeric values:
-{
-  "brightness": <number between 0.85 and 1.25, where 1.0 = no change>,
-  "contrast": <number between 0.90 and 1.35, where 1.0 = no change>,
-  "saturation": <number between 0.90 and 1.30, where 1.0 = no change>,
-  "warmth": <number between -15 and 15, positive = warmer/yellower, negative = cooler/bluer>,
-  "shadows": <number between 0 and 40, amount to lift dark areas>,
-  "highlights": <number between 0 and 30, amount to reduce blown highlights>,
-  "sharpness": <number between 0 and 1, sharpening strength>
-}
-
-Rules:
-- Improve illumination, contrast and colors naturally
-- Make the photo more vibrant and attractive but still realistic
-- Correct white balance naturally
-- Enhance texture without changing real materials
-- Return ONLY the JSON object, nothing else`;
+// A chave do Gemini e o prompt de análise agora vivem na Edge Function
+// "analisar-foto" (servidor). Nada de chave de IA no bundle do navegador.
 
 type WatermarkPosition = 'bottom-left' | 'bottom-right';
 
@@ -190,74 +171,55 @@ async function applyWatermark(
 }
 
 // ───────────────────────────────────────────────
-// Convert File to base64
+// Reduz a imagem (~maxDim px) e devolve só o base64 — usado APENAS para a
+// análise pela IA. A imagem full-res original continua sendo a base do
+// enhancement local. Payload menor = mais rápido, mais barato e dentro do
+// limite de tamanho da Edge Function.
 // ───────────────────────────────────────────────
-function fileToBase64(file: File): Promise<string> {
+function downscaleToBase64(file: File, maxDim = 1024): Promise<string> {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1]); // just base64 part
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(url);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve(dataUrl.split(',')[1]);
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Erro ao carregar imagem')); };
+        img.src = url;
     });
 }
 
 // ───────────────────────────────────────────────
-// Step 1: Ask Gemini to analyze photo → return JSON params
+// Step 1: Edge Function "analisar-foto" analisa a foto → devolve params JSON.
+// A chave do Gemini fica no servidor. `userApiKey` é um override opcional
+// (chave própria do usuário, digitada nas configurações).
 // ───────────────────────────────────────────────
-async function analyzeWithGemini(file: File, apiKey: string): Promise<EnhancementParams> {
-    const base64 = await fileToBase64(file);
-    const mimeType = file.type;
-
+async function analyzePhotoViaEdge(file: File, userApiKey?: string): Promise<EnhancementParams> {
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: AI_ANALYSIS_PROMPT },
-                            { inline_data: { mime_type: mimeType, data: base64 } }
-                        ]
-                    }],
-                    generationConfig: {
-                        response_mime_type: 'application/json',
-                        temperature: 0.2,
-                        maxOutputTokens: 256
-                    }
-                })
-            }
-        );
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            console.warn('Gemini analysis failed:', err?.error?.message);
+        const imageBase64 = await downscaleToBase64(file, 1024);
+        const { data, error } = await supabase.functions.invoke('analisar-foto', {
+            body: {
+                imageBase64,
+                mimeType: 'image/jpeg',
+                userApiKey: userApiKey?.trim() || undefined,
+            },
+        });
+        if (error) {
+            console.warn('Análise IA falhou, usando padrões:', error.message);
             return DEFAULT_PARAMS;
         }
-
-        const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-        // Parse JSON from response (remove markdown fences if present)
-        const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const parsed = JSON.parse(cleaned) as Partial<EnhancementParams>;
-
-        // Merge with defaults and clamp values
-        return {
-            brightness: Math.min(1.30, Math.max(0.80, parsed.brightness ?? DEFAULT_PARAMS.brightness)),
-            contrast: Math.min(1.40, Math.max(0.85, parsed.contrast ?? DEFAULT_PARAMS.contrast)),
-            saturation: Math.min(1.35, Math.max(0.85, parsed.saturation ?? DEFAULT_PARAMS.saturation)),
-            warmth: Math.min(20, Math.max(-20, parsed.warmth ?? DEFAULT_PARAMS.warmth)),
-            shadows: Math.min(50, Math.max(0, parsed.shadows ?? DEFAULT_PARAMS.shadows)),
-            highlights: Math.min(40, Math.max(0, parsed.highlights ?? DEFAULT_PARAMS.highlights)),
-            sharpness: Math.min(1, Math.max(0, parsed.sharpness ?? DEFAULT_PARAMS.sharpness)),
-        };
+        return (data?.params as EnhancementParams) ?? DEFAULT_PARAMS;
     } catch (e) {
-        console.warn('Gemini analysis error, using defaults:', e);
+        console.warn('Erro na análise IA, usando padrões:', e);
         return DEFAULT_PARAMS;
     }
 }
@@ -357,12 +319,8 @@ async function applyEnhancement(file: File, params: EnhancementParams): Promise<
 // ───────────────────────────────────────────────
 // Main processor: Gemini → Canvas
 // ───────────────────────────────────────────────
-async function processImageWithGemini(file: File, apiKey: string): Promise<string> {
-    // If no API key, use default params
-    const params = apiKey
-        ? await analyzeWithGemini(file, apiKey)
-        : DEFAULT_PARAMS;
-
+async function processImage(file: File, userApiKey?: string): Promise<string> {
+    const params = await analyzePhotoViaEdge(file, userApiKey);
     return applyEnhancement(file, params);
 }
 
@@ -415,7 +373,8 @@ export function FotosIA() {
         }
     });
     const [showSettings, setShowSettings] = useState(false);
-    const [apiKey, setApiKey] = useState(() => localStorage.getItem('fotosIA_apiKey') || GEMINI_API_KEY);
+    // Override opcional: chave própria do usuário (vazio = usa a IA padrão do servidor).
+    const [apiKey, setApiKey] = useState(() => localStorage.getItem('fotosIA_apiKey') || '');
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
@@ -498,11 +457,6 @@ export function FotosIA() {
     // ── Process Images ──
     const handleProcess = async () => {
         const key = apiKey.trim();
-        if (!key) {
-            toast.error('Configure a chave da API Gemini nas configurações.');
-            setShowSettings(true);
-            return;
-        }
         const pending = images.filter(i => i.status === 'pending');
         if (!pending.length) {
             toast.info('Nenhuma imagem pendente para processar.');
@@ -516,7 +470,7 @@ export function FotosIA() {
             setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'processing' } : i));
 
             try {
-                let processedUrl = await processImageWithGemini(img.originalFile, key);
+                let processedUrl = await processImage(img.originalFile, key || undefined);
 
                 // Apply watermark if logo is set
                 if (watermark.logoUrl) {
@@ -537,10 +491,9 @@ export function FotosIA() {
     // ── Retry single ──
     const handleRetry = async (img: ProcessedImage) => {
         const key = apiKey.trim();
-        if (!key) { toast.error('Configure a chave da API.'); return; }
         setImages(prev => prev.map(i => i.id === img.id ? { ...i, status: 'processing', error: undefined } : i));
         try {
-            let processedUrl = await processImageWithGemini(img.originalFile, key);
+            let processedUrl = await processImage(img.originalFile, key || undefined);
             if (watermark.logoUrl) {
                 processedUrl = await applyWatermark(processedUrl, watermark.logoUrl, watermark.position, watermark.opacity);
             }
@@ -582,7 +535,7 @@ export function FotosIA() {
                     <CardContent className="space-y-6">
                         {/* API Key */}
                         <div className="space-y-2">
-                            <Label>Chave da API Gemini</Label>
+                            <Label>Chave da API Gemini (opcional)</Label>
                             <div className="flex gap-2">
                                 <input
                                     type="password"
@@ -596,7 +549,7 @@ export function FotosIA() {
                                     toast.success('Chave salva!');
                                 }}>Salvar</Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">A chave fica salva localmente no navegador.</p>
+                            <p className="text-xs text-muted-foreground">Deixe em branco para usar a IA padrão do sistema. Se preencher, sua própria chave (salva localmente no navegador) será usada no lugar.</p>
                         </div>
 
                         {/* Watermark */}
